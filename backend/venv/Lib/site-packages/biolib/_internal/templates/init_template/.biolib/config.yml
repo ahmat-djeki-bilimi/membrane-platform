@@ -1,0 +1,19 @@
+biolib_version: 2
+
+modules:
+    main:
+        image: 'local-docker://BIOLIB_REPLACE_DOCKER_TAG:latest'
+        command: "bash run.sh"
+        working_directory: /home/biolib/
+        input_files:
+            - COPY / /home/biolib/
+        output_files:
+            - COPY /home/biolib/output/ /
+
+BIOLIB_REPLACE_GUI_CONFIG
+arguments:
+    -
+        key: --input
+        description: 'Input protein sequences'
+        type: sequence
+        required: true

@@ -1,0 +1,5 @@
+*.eif
+*.tar
+.idea
+parent/venv/
+*__pycache__*

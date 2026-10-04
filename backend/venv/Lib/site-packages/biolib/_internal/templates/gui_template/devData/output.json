@@ -1,0 +1,7 @@
+{
+  "message": "Example JSON data for development",
+  "results": [
+    { "id": 1, "value": "Sample result 1" },
+    { "id": 2, "value": "Sample result 2" }
+  ]
+}
