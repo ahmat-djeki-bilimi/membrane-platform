@@ -1,5 +1,6 @@
 "use client";
 
+import { API_BASE } from "@/lib/api";
 import { useEffect, useMemo, useState } from "react";
 import { Atom, Eye, Loader2, MapPin, Target } from "lucide-react";
 
@@ -73,7 +74,7 @@ export default function ActiveSitePanel({
 
       try {
         const res = await fetch(
-          `http://127.0.0.1:8000/api/active-site/${pdbId}?cutoff=5`
+          `${API_BASE}/api/active-site/${pdbId}?cutoff=5`
         );
 
         const json: ActiveSiteData = await res.json();
@@ -163,7 +164,7 @@ export default function ActiveSitePanel({
     return (
       <section className="rounded border border-slate-200 bg-white p-3 shadow-sm">
         <Header />
-        <div className="rounded border border-amber-100 bg-amber-50 p-3 text-[12px] text-amber-900">
+        <div className="rounded border border-amber-100 bg-amber-50 p-3 text-[14px] text-amber-900">
           Sélectionne une structure PDB pour détecter les ligands et le site actif.
         </div>
       </section>
@@ -175,7 +176,7 @@ export default function ActiveSitePanel({
       <Header />
 
       {loading && (
-        <div className="flex items-center gap-2 rounded border border-blue-100 bg-blue-50 p-3 text-[12px] text-blue-800">
+        <div className="flex items-center gap-2 rounded border border-blue-100 bg-blue-50 p-3 text-[14px] text-blue-800">
           <Loader2 size={15} className="animate-spin" />
           Analyse expert : ligands, résidus modifiés et poche fonctionnelle...
         </div>
@@ -190,19 +191,19 @@ export default function ActiveSitePanel({
               <div className="mb-2 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Atom size={16} className="text-rose-700" />
-                  <p className="text-[12px] font-bold text-rose-900">
+                  <p className="text-[14px] font-bold text-rose-900">
                     Ligands / groupes HET
                   </p>
                 </div>
 
-                <span className="rounded bg-white px-2 py-1 text-[10px] font-bold text-rose-700">
+                <span className="rounded bg-white px-2 py-1 text-[12px] font-bold text-rose-700">
                   {data.ligands.length}
                 </span>
               </div>
 
               {data.ligands.length > 0 ? (
                 <div className="max-h-[345px] overflow-auto rounded border border-rose-100 bg-white">
-                  <table className="w-full text-[11px]">
+                  <table className="w-full text-[13px]">
                     <thead className="sticky top-0 bg-rose-100 text-rose-900">
                       <tr>
                         <th className="p-2 text-left">Ligand</th>
@@ -231,7 +232,7 @@ export default function ActiveSitePanel({
                               <div className="font-bold text-rose-800">
                                 {ligand.name}
                               </div>
-                              <div className="text-[10px] font-semibold text-rose-600">
+                              <div className="text-[12px] font-semibold text-rose-600">
                                 {ligand.type === "known_important"
                                   ? "important"
                                   : "HET"}
@@ -250,7 +251,7 @@ export default function ActiveSitePanel({
                               <button
                                 onClick={() => focusLigand(ligand)}
                                 disabled={!ligand.nearby_residues.length}
-                                className={`inline-flex items-center justify-center rounded px-2 py-1 text-[10px] font-bold text-white ${
+                                className={`inline-flex items-center justify-center rounded px-2 py-1 text-[12px] font-bold text-white ${
                                   isSelected
                                     ? "bg-rose-900"
                                     : "bg-rose-600 hover:bg-rose-700"
@@ -267,13 +268,13 @@ export default function ActiveSitePanel({
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <p className="text-[12px] leading-5 text-rose-900">
+                  <p className="text-[14px] leading-5 text-rose-900">
                     Aucun ligand classique détecté.
                   </p>
 
                   {data.detected_het_groups &&
                     Object.keys(data.detected_het_groups).length > 0 && (
-                      <div className="rounded bg-white p-2 text-[11px] text-slate-700">
+                      <div className="rounded bg-white p-2 text-[13px] text-slate-700">
                         <p className="font-bold text-slate-900">
                           Groupes HET observés
                         </p>
@@ -290,7 +291,7 @@ export default function ActiveSitePanel({
               <div className="mb-2 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <MapPin size={16} className="text-slate-700" />
-                  <p className="text-[12px] font-bold text-slate-900">
+                  <p className="text-[14px] font-bold text-slate-900">
                     Résidus interactifs
                   </p>
                 </div>
@@ -298,7 +299,7 @@ export default function ActiveSitePanel({
                 <button
                   onClick={focusWholeSite}
                   disabled={!data.active_site_residues.length}
-                  className="inline-flex items-center gap-1 rounded bg-rose-600 px-2 py-1 text-[10px] font-bold text-white disabled:bg-slate-300"
+                  className="inline-flex items-center gap-1 rounded bg-rose-600 px-2 py-1 text-[12px] font-bold text-white disabled:bg-slate-300"
                 >
                   <Target size={11} />
                   afficher tout
@@ -307,7 +308,7 @@ export default function ActiveSitePanel({
 
               {residuesToShow.length > 0 ? (
                 <div className="max-h-[345px] overflow-auto rounded border border-slate-200 bg-white">
-                  <table className="w-full text-[11px]">
+                  <table className="w-full text-[13px]">
                     <thead className="sticky top-0 bg-slate-100">
                       <tr>
                         <th className="p-2 text-left">Résidu</th>
@@ -367,7 +368,7 @@ export default function ActiveSitePanel({
                                     },
                                   })
                                 }
-                                className={`inline-flex items-center justify-center rounded px-2 py-1 text-[10px] font-bold text-white ${
+                                className={`inline-flex items-center justify-center rounded px-2 py-1 text-[12px] font-bold text-white ${
                                   isActive
                                     ? "bg-slate-900"
                                     : data.mode === "predicted_pocket"
@@ -385,23 +386,23 @@ export default function ActiveSitePanel({
                   </table>
                 </div>
               ) : (
-                <p className="text-[12px] leading-5 text-slate-600">
+                <p className="text-[14px] leading-5 text-slate-600">
                   Aucun résidu fonctionnel ou proche de ligand n’a été identifié.
                 </p>
               )}
             </div>
 
             <div className="col-span-3 rounded border border-emerald-100 bg-emerald-50 p-3">
-              <p className="mb-2 text-[12px] font-bold text-emerald-900">
+              <p className="mb-2 text-[14px] font-bold text-emerald-900">
                 Interprétation expert
               </p>
 
-              <p className="text-[12px] leading-5 text-emerald-900">
+              <p className="text-[14px] leading-5 text-emerald-900">
                 {data.interpretation}
               </p>
 
               {selectedSite && (
-                <div className="mt-3 rounded border border-emerald-200 bg-white p-2 text-[11px] leading-5 text-slate-700">
+                <div className="mt-3 rounded border border-emerald-200 bg-white p-2 text-[13px] leading-5 text-slate-700">
                   <p className="font-bold text-emerald-900">
                     Sélection active
                   </p>
@@ -412,13 +413,13 @@ export default function ActiveSitePanel({
                 </div>
               )}
 
-              <div className="mt-3 rounded bg-white p-2 text-[11px] leading-5 text-slate-700">
+              <div className="mt-3 rounded bg-white p-2 text-[13px] leading-5 text-slate-700">
                 Rouge = ligand/site de liaison réel. Violet = poche prédite
                 sans ligand classique.
               </div>
 
               {data.error && (
-                <div className="mt-3 rounded border border-red-100 bg-red-50 p-2 text-[11px] leading-5 text-red-800">
+                <div className="mt-3 rounded border border-red-100 bg-red-50 p-2 text-[13px] leading-5 text-red-800">
                   Erreur backend : {data.error}
                 </div>
               )}
@@ -452,7 +453,7 @@ function ModeBanner({
       : "border-amber-100 bg-amber-50 text-amber-900";
 
   return (
-    <div className={`rounded border p-3 text-[12px] font-semibold ${cls}`}>
+    <div className={`rounded border p-3 text-[14px] font-semibold ${cls}`}>
       {label} · confiance : {confidence || "low"}
     </div>
   );
@@ -464,12 +465,12 @@ function Header() {
       <Atom size={17} className="text-rose-700" />
 
       <div>
-        <h2 className="text-[14px] font-bold text-slate-900">
+        <h2 className="text-[16px] font-bold text-slate-900">
           Site actif expert interactif
         </h2>
 
-        <p className="text-[11px] text-slate-500">
-          Détection ligand-based, ligands biologiques importants, puis fallback par poche fonctionnelle prédite.
+        <p className="text-[13px] text-slate-500">
+          Résidus situés à proximité des ligands présents dans la structure PDB (hors eau, ions et additifs de cristallisation).
         </p>
       </div>
     </div>

@@ -1,0 +1,19 @@
+##gff-version 3
+# P02945 Length: 262
+# P02945 Number of predicted TMRs: 7
+P02945	outside	1	23
+P02945	TMhelix	24	42
+P02945	inside	43	54
+P02945	TMhelix	55	75
+P02945	outside	76	92
+P02945	TMhelix	93	110
+P02945	inside	111	120
+P02945	TMhelix	121	138
+P02945	outside	139	147
+P02945	TMhelix	148	166
+P02945	inside	167	188
+P02945	TMhelix	189	204
+P02945	outside	205	215
+P02945	TMhelix	216	236
+P02945	inside	237	262
+//
