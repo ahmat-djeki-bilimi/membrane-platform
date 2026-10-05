@@ -28,10 +28,13 @@ else:
 
 def _runners() -> dict[str, Callable[[dict], dict]]:
     """Calculs disponibles, par type de tâche."""
+    from app.services.conservation_service import compute_conservation, compute_sequence_conservation
     from app.services.membrane_service import predict_topology_isolated
 
     return {
         "deeptmhmm": lambda p: predict_topology_isolated(p["sequence"], p.get("name", "query")),
+        "conservation": lambda p: compute_conservation(p["accession"], p.get("source", "uniref50")),
+        "conservation_sequence": lambda p: compute_sequence_conservation(p["sequence"], p.get("name", "query")),
     }
 
 

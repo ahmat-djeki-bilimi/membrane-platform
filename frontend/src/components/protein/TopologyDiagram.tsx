@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { buildTopology, type Region, type Side } from "@/lib/topology";
 
 type HighlightRange = { start: number; end: number; label?: string; color?: string };
@@ -34,13 +34,17 @@ export default function TopologyDiagram({
   length,
   activeRange,
   onSelect,
+  residueColor,
 }: {
   regions: Region[];
   length: number;
   activeRange?: HighlightRange | null;
   onSelect?: (range: HighlightRange) => void;
+  /** Couleur de chaque résidu (ex. conservation) ; sinon couleurs par type. */
+  residueColor?: (position: number) => string | undefined;
 }) {
   const [tip, setTip] = useState<Tip>(null);
+  const uid = useId().replace(/:/g, "");
   const topology = useMemo(() => buildTopology(regions, length), [regions, length]);
 
   if (!topology) {
@@ -98,10 +102,12 @@ export default function TopologyDiagram({
     if (i === 0) {
       const to = ends[0].entry;
       const from = { x: Math.max(28, to.x - Math.min(70, 25 + len)), y: to.y + d * h * 0.8 };
+      const c2 = { x: to.x - 10, y: to.y + d * h * 0.6 };
       return {
         loop,
         color,
-        d: `M ${from.x} ${from.y} C ${from.x} ${from.y}, ${to.x - 10} ${to.y + d * h * 0.6}, ${to.x} ${to.y}`,
+        pts: [from, from, c2, to],
+        d: `M ${from.x} ${from.y} C ${from.x} ${from.y}, ${c2.x} ${c2.y}, ${to.x} ${to.y}`,
         apex: from,
         terminal: { label: "N", ...from },
         len,
@@ -110,10 +116,12 @@ export default function TopologyDiagram({
     if (i === loops.length - 1) {
       const from = ends[n - 1].exit;
       const to = { x: Math.min(W - 28, from.x + Math.min(70, 25 + len)), y: from.y + d * h * 0.8 };
+      const c1 = { x: from.x + 10, y: from.y + d * h * 0.6 };
       return {
         loop,
         color,
-        d: `M ${from.x} ${from.y} C ${from.x + 10} ${from.y + d * h * 0.6}, ${to.x} ${to.y}, ${to.x} ${to.y}`,
+        pts: [from, c1, to, to],
+        d: `M ${from.x} ${from.y} C ${c1.x} ${c1.y}, ${to.x} ${to.y}, ${to.x} ${to.y}`,
         apex: to,
         terminal: { label: "C", ...to },
         len,
@@ -124,12 +132,50 @@ export default function TopologyDiagram({
     return {
       loop,
       color,
+      pts: [from, { x: from.x, y: from.y + d * h }, { x: to.x, y: to.y + d * h }, to],
       d: `M ${from.x} ${from.y} C ${from.x} ${from.y + d * h}, ${to.x} ${to.y + d * h}, ${to.x} ${to.y}`,
       apex: { x: (from.x + to.x) / 2, y: from.y + d * h * 0.75 },
       terminal: null,
       len,
     };
   });
+
+  // Point d'une courbe de Bézier cubique
+  const bezier = (p: { x: number; y: number }[], t: number) => {
+    const u = 1 - t;
+    return {
+      x: u * u * u * p[0].x + 3 * u * u * t * p[1].x + 3 * u * t * t * p[2].x + t * t * t * p[3].x,
+      y: u * u * u * p[0].y + 3 * u * u * t * p[1].y + 3 * u * t * t * p[2].y + t * t * t * p[3].y,
+    };
+  };
+
+  /** Tranches colorées d'un élément membranaire, de l'entrée vers la sortie. */
+  const slices = (
+    clipId: string,
+    columns: { x: number; width: number; from: number; to: number; start: number; end: number }[]
+  ) =>
+    residueColor ? (
+      <g clipPath={`url(#${clipId})`}>
+        {columns.flatMap((col) => {
+          const count = col.end - col.start + 1;
+          if (count <= 0) return [];
+          const step = (col.to - col.from) / count;
+          return Array.from({ length: count }, (_, k) => {
+            const y0 = col.from + k * step;
+            return (
+              <rect
+                key={`${col.start}-${k}`}
+                x={col.x}
+                y={Math.min(y0, y0 + step)}
+                width={col.width}
+                height={Math.abs(step) + 0.4}
+                fill={residueColor(col.start + k) ?? "#e2e8f0"}
+              />
+            );
+          });
+        })}
+      </g>
+    ) : null;
 
   const motifs = regions.filter((r) => r.type === "motif");
   const motifMarks = motifs.map((m) => {
@@ -243,6 +289,27 @@ export default function TopologyDiagram({
             </g>
           ))}
 
+          {/* Résidus des boucles colorés (ex. conservation) */}
+          {residueColor &&
+            loopPaths.map((p, li) =>
+              Array.from({ length: Math.max(p.len, 0) }, (_, k) => {
+                const point = bezier(p.pts, (k + 0.5) / p.len);
+                const color = residueColor(p.loop.start + k);
+                return color ? (
+                  <circle
+                    key={`bead-${li}-${k}`}
+                    cx={point.x}
+                    cy={point.y}
+                    r={p.len > 60 ? 2.4 : 3.2}
+                    fill={color}
+                    stroke="#475569"
+                    strokeWidth={0.4}
+                    pointerEvents="none"
+                  />
+                ) : null;
+              })
+            )}
+
           {/* Éléments membranaires */}
           {elements.map((e, i) => {
             const entrySide = loops[i].side;
@@ -266,6 +333,9 @@ export default function TopologyDiagram({
                   onClick={() => select(e.start, e.end, label)}
                   onMouseEnter={() => show(cx(i), MT - 20, title, `Résidus ${e.start}–${e.end} · ${e.end - e.start + 1} aa`)}
                 >
+                  <clipPath id={`${uid}-tm-${i}`}>
+                    <rect x={cx(i) - HELIX_W / 2} y={y} width={HELIX_W} height={h} rx={HELIX_W / 2} />
+                  </clipPath>
                   <rect
                     x={cx(i) - HELIX_W / 2}
                     y={y}
@@ -273,10 +343,38 @@ export default function TopologyDiagram({
                     height={h}
                     rx={HELIX_W / 2}
                     fill="url(#helixGrad)"
-                    stroke={active ? "#7c3aed" : COLORS.helixDark}
+                  />
+                  {slices(`${uid}-tm-${i}`, [
+                    {
+                      x: cx(i) - HELIX_W / 2,
+                      width: HELIX_W,
+                      from: entrySide === "out" ? y : y + h,
+                      to: entrySide === "out" ? y + h : y,
+                      start: e.start,
+                      end: e.end,
+                    },
+                  ])}
+                  <rect
+                    x={cx(i) - HELIX_W / 2}
+                    y={y}
+                    width={HELIX_W}
+                    height={h}
+                    rx={HELIX_W / 2}
+                    fill="none"
+                    stroke={active ? "#7c3aed" : residueColor ? "#475569" : COLORS.helixDark}
                     strokeWidth={active ? 3 : 1}
                   />
-                  <text x={cx(i)} y={MID + 4} fontSize={11} fontWeight={700} fill="white" textAnchor="middle">
+                  <text
+                    x={cx(i)}
+                    y={MID + 4}
+                    fontSize={11}
+                    fontWeight={700}
+                    fill="white"
+                    textAnchor="middle"
+                    stroke={residueColor ? "#0f172a" : "none"}
+                    strokeWidth={residueColor ? 3 : 0}
+                    paintOrder="stroke"
+                  >
                     {label}
                   </text>
                   <text x={cx(i) + HELIX_W / 2 + 3} y={boundary(entrySide) + (entrySide === "out" ? 4 : 0)} fontSize={10} fill="#64748b">
@@ -299,6 +397,9 @@ export default function TopologyDiagram({
                 onClick={() => select(e.start, e.end, "Région intramembranaire")}
                 onMouseEnter={() => show(cx(i), entrySide === "out" ? MT - 20 : MB + 20, title, `Résidus ${e.start}–${e.end}`)}
               >
+                <clipPath id={`${uid}-re-${i}`}>
+                  <rect x={cx(i) - HELIX_W / 2} y={top} width={HELIX_W} height={bottom - top} rx={HELIX_W / 2} />
+                </clipPath>
                 <rect
                   x={cx(i) - HELIX_W / 2}
                   y={top}
@@ -306,10 +407,38 @@ export default function TopologyDiagram({
                   height={bottom - top}
                   rx={HELIX_W / 2}
                   fill="url(#reGrad)"
-                  stroke={active ? "#7c3aed" : COLORS.reentrant}
+                />
+                {(() => {
+                  // Descente dans la bicouche (colonne gauche) puis remontée (colonne droite)
+                  const half = Math.floor((e.end - e.start + 1) / 2);
+                  const outer = entrySide === "out" ? top : bottom;
+                  const inner = entrySide === "out" ? bottom : top;
+                  return slices(`${uid}-re-${i}`, [
+                    { x: cx(i) - HELIX_W / 2, width: HELIX_W / 2, from: outer, to: inner, start: e.start, end: e.start + half - 1 },
+                    { x: cx(i), width: HELIX_W / 2, from: inner, to: outer, start: e.start + half, end: e.end },
+                  ]);
+                })()}
+                <rect
+                  x={cx(i) - HELIX_W / 2}
+                  y={top}
+                  width={HELIX_W}
+                  height={bottom - top}
+                  rx={HELIX_W / 2}
+                  fill="none"
+                  stroke={active ? "#7c3aed" : residueColor ? "#475569" : COLORS.reentrant}
                   strokeWidth={active ? 3 : 1}
                 />
-                <text x={cx(i)} y={(top + bottom) / 2 + 4} fontSize={11} fontWeight={700} fill="white" textAnchor="middle">
+                <text
+                  x={cx(i)}
+                  y={(top + bottom) / 2 + 4}
+                  fontSize={11}
+                  fontWeight={700}
+                  fill="white"
+                  textAnchor="middle"
+                  stroke={residueColor ? "#0f172a" : "none"}
+                  strokeWidth={residueColor ? 3 : 0}
+                  paintOrder="stroke"
+                >
                   {label}
                 </text>
               </g>

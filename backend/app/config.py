@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     deeptmhmm_enabled: bool = True
     deeptmhmm_max_length: int = 10_000
 
+    # Serveur MMseqs2 pour la recherche d'homologues à partir d'une séquence
+    # (public ColabFold par défaut ; à remplacer par un serveur dédié en production)
+    mmseqs_server_url: str = "https://api.colabfold.com"
+
     # Applique les migrations au démarrage de l'API (désactivé en production,
     # où `alembic upgrade head` est lancé une seule fois avant les serveurs)
     auto_migrate: bool = True

@@ -30,6 +30,8 @@ import SiteFooter from "../../components/SiteFooter";
 import SearchForm, { SEQUENCE_STORAGE_PREFIX } from "../../components/SearchForm";
 import SequencePaste from "../../components/SequencePaste";
 import SaveToProject from "../../components/SaveToProject";
+import ConservationSummary from "../../components/evolution/ConservationSummary";
+import EvolutionPanel from "../../components/evolution/EvolutionPanel";
 import SequenceViewer from "../../components/sequence/SequenceViewer";
 import HydropathyChart from "../../components/sequence/HydropathyChart";
 import CompositionChart from "../../components/sequence/CompositionChart";
@@ -816,6 +818,9 @@ function SearchContent() {
                 </div>
               </div>
             </Panel>
+
+            {mode === "accession" && uniprot && <ConservationSummary accession={uniprot.accession} />}
+            {mode === "sequence" && sequence.length >= 20 && <EvolutionPanel sequence={sequence} name={entryName} />}
 
             <div className="grid gap-4 lg:grid-cols-2">
               <Panel
