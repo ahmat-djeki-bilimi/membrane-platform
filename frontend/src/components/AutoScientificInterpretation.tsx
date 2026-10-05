@@ -11,8 +11,8 @@ type PDBStructure = {
 
 type AlphaFoldData = {
   available: boolean;
-  confidence?: number;
-  confidence_avg?: number;
+  confidence?: number | null;
+  confidence_avg?: number | null;
   protein_name?: string;
   organism?: string;
   sequence?: string;
@@ -42,6 +42,7 @@ type QualityData = {
     clashscore?: number | null;
     sidechain_outliers_percent?: number | null;
     rsrz_outliers_percent?: number | null;
+    rcsb_ramachandran_outliers_percent?: number | null;
   };
 };
 
@@ -66,7 +67,11 @@ export default function AutoScientificInterpretation({
   const confidence =
     alphafold?.confidence ?? alphafold?.confidence_avg ?? null;
 
-  const ramaOutliers = qualityData?.ramachandran?.outliers_percent ?? null;
+  // Valeur officielle wwPDB en priorité, calcul local sinon
+  const ramaOutliers =
+    qualityData?.geometry?.rcsb_ramachandran_outliers_percent ??
+    qualityData?.ramachandran?.outliers_percent ??
+    null;
   const ramaFavored = qualityData?.ramachandran?.favored_percent ?? null;
   const clashscore = qualityData?.geometry?.clashscore ?? null;
 
@@ -108,16 +113,16 @@ export default function AutoScientificInterpretation({
         <div className="flex items-center gap-2">
           <Brain size={18} className="text-[#0f4c81]" />
           <div>
-            <h2 className="text-[14px] font-bold text-slate-900">
+            <h2 className="text-[16px] font-bold text-slate-900">
               Interprétation 
             </h2>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[13px] text-slate-500">
               Conclusion générée à partir de la structure, des segments TM et de la validation géométrique.
             </p>
           </div>
         </div>
 
-        <span className={`rounded px-3 py-1 text-[11px] font-bold ${levelClass(globalLevel.level)}`}>
+        <span className={`rounded px-3 py-1 text-[13px] font-bold ${levelClass(globalLevel.level)}`}>
           {globalLevel.label}
         </span>
       </div>
@@ -148,12 +153,12 @@ export default function AutoScientificInterpretation({
       <div className="mt-3 rounded border border-slate-200 bg-slate-50 p-3">
         <div className="mb-2 flex items-center gap-2">
           <FileText size={15} className="text-slate-700" />
-          <p className="text-[12px] font-bold text-slate-900">
+          <p className="text-[14px] font-bold text-slate-900">
             Conclusion.
           </p>
         </div>
 
-        <p className="text-[12px] leading-6 text-slate-700">
+        <p className="text-[14px] leading-6 text-slate-700">
           {buildReportConclusion({
             accession,
             tmCount,
@@ -229,7 +234,7 @@ function buildBiologicalInterpretation({
   alphafold: AlphaFoldData | null;
 }) {
   if (tmCount >= 6) {
-    return `La protéine présente ${tmCount} segments transmembranaires, ce qui suggère une architecture membranaire multipasse. Ce profil est compatible avec des protéines de type récepteurs, transporteurs ou canaux membranaires. Les segments bleus dans le viewer correspondent aux régions hydrophobes probablement insérées dans la bicouche lipidique.`;
+    return `La protéine présente ${tmCount} segments transmembranaires, ce qui suggère une architecture membranaire multipasse. Ce profil est compatible avec des protéines de type récepteurs, transporteurs ou canaux membranaires. Les segments orange dans la visionneuse correspondent aux régions hydrophobes probablement insérées dans la bicouche lipidique.`;
   }
 
   if (tmCount >= 2) {
@@ -409,9 +414,9 @@ function InterpretBlock({
     <div className={`col-span-4 rounded border p-3 ${styles[tone]}`}>
       <div className="mb-2 flex items-center gap-2">
         {icon}
-        <p className="text-[12px] font-bold">{title}</p>
+        <p className="text-[14px] font-bold">{title}</p>
       </div>
-      <p className="text-[12px] leading-5">{text}</p>
+      <p className="text-[14px] leading-5">{text}</p>
     </div>
   );
 }
@@ -419,10 +424,10 @@ function InterpretBlock({
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded border border-slate-200 bg-slate-50 p-2 text-center">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+      <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-slate-500">
         {label}
       </p>
-      <p className="text-[16px] font-bold text-slate-900">{value}</p>
+      <p className="text-[18px] font-bold text-slate-900">{value}</p>
     </div>
   );
 }

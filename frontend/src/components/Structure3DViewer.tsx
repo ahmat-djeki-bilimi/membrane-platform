@@ -7,6 +7,8 @@ type HighlightRange = {
   end: number;
   label?: string;
   color?: string;
+  /** Chaîne de la structure ; sans chaîne, toutes les chaînes sont concernées. */
+  chain?: string;
 };
 
 type Structure3DViewerProps = {
@@ -56,7 +58,7 @@ export default function Structure3DViewer({
       const residues = buildResidueList(range.start, range.end);
 
       viewer.setStyle(
-        { resi: residues },
+        { resi: residues, ...(range.chain ? { chain: range.chain } : {}) },
         {
           cartoon: {
             color,
@@ -66,7 +68,7 @@ export default function Structure3DViewer({
       );
 
       viewer.addStyle(
-        { resi: residues },
+        { resi: residues, ...(range.chain ? { chain: range.chain } : {}) },
         {
           stick: {
             color,
@@ -77,7 +79,7 @@ export default function Structure3DViewer({
 
       if (focused) {
         viewer.addStyle(
-          { resi: residues },
+          { resi: residues, ...(range.chain ? { chain: range.chain } : {}) },
           {
             sphere: {
               color,
@@ -144,6 +146,7 @@ export default function Structure3DViewer({
         const first = highlightRanges[0];
         viewer.zoomTo({
           resi: buildResidueList(first.start, first.end),
+          ...(first.chain ? { chain: first.chain } : {}),
         });
       } else {
         viewer.zoomTo();
@@ -188,29 +191,12 @@ export default function Structure3DViewer({
         style={{ width: "100%", height: "100%" }}
       />
 
-      {autoHighlightRanges.length > 0 && (
-        <div className="absolute right-3 top-3 rounded-lg border border-slate-200 bg-white/95 px-3 py-2 text-[11px] shadow-sm">
-          <p className="mb-1 font-bold text-slate-800">Coloration auto</p>
-          <div className="flex items-center gap-2">
-            <span className="h-3 w-3 rounded bg-blue-600" />
-            <span>Transmembrane</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="h-3 w-3 rounded bg-red-500" />
-            <span>Outliers</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="h-3 w-3 rounded bg-amber-500" />
-            <span>Allowed</span>
-          </div>
-        </div>
-      )}
-
       {highlightRanges.length > 0 && (
-        <div className="absolute left-3 top-3 rounded-lg border border-red-100 bg-white/95 px-3 py-2 text-[11px] shadow-sm">
+        <div className="absolute left-3 top-3 rounded-lg border border-red-100 bg-white/95 px-3 py-2 text-[13px] shadow-sm">
           <p className="font-bold text-red-700">Région ciblée</p>
           <p className="text-slate-700">
             {highlightRanges[0].label || "Région sélectionnée"} ·{" "}
+            {highlightRanges[0].chain ? `chaîne ${highlightRanges[0].chain} · ` : ""}
             {highlightRanges[0].start}-{highlightRanges[0].end}
           </p>
         </div>

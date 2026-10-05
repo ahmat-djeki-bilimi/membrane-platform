@@ -1,39 +1,53 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
-import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { useParams } from "next/navigation";
 import dynamic from "next/dynamic";
-
-import StructureQualityPanel from "@/components/StructureQualityPanel";
-import StructuralInterpretation from "@/components/StructuralInterpretation";
-import StructuralDomains from "@/components/StructuralDomains";
-import AutoScientificInterpretation from "@/components/AutoScientificInterpretation";
-import ActiveSitePanel from "@/components/ActiveSitePanel";
-import MultiStructureComparison from "@/components/MultiStructureComparison";
-import MembraneOrientationPanel from "@/components/MembraneOrientationPanel";
-
 import {
+  AlertTriangle,
   ArrowLeft,
+  CheckCircle2,
+  Info,
+  XCircle,
+  Boxes,
   Brain,
-  Cpu,
+  ChevronRight,
+  Crosshair,
   Database,
   Dna,
   Download,
   ExternalLink,
   Eye,
-  Layers3,
+  GitCompare,
+  Layers,
+  LayoutDashboard,
   Loader2,
-  Microscope,
-  RefreshCw,
   ShieldCheck,
   Waves,
 } from "lucide-react";
 
-const Structure3DViewer = dynamic(
-  () => import("@/components/Structure3DViewer"),
-  { ssr: false }
-);
+import SiteHeader from "@/components/SiteHeader";
+import SiteFooter from "@/components/SiteFooter";
+import { Alert, StatCard } from "@/components/ui";
+import StructuralDomains from "@/components/StructuralDomains";
+import AutoScientificInterpretation from "@/components/AutoScientificInterpretation";
+import ActiveSitePanel from "@/components/ActiveSitePanel";
+import MultiStructureComparison from "@/components/MultiStructureComparison";
+import MembraneOrientationPanel from "@/components/MembraneOrientationPanel";
+import { API_BASE } from "@/lib/api";
+import { HERO_BG, HERO_GLOW } from "@/lib/theme";
+import PlddtProfile from "@/components/protein/PlddtProfile";
+import SaveToProject from "@/components/SaveToProject";
+import { mapRanges, type NumberedRange, type ResidueMapping } from "@/lib/mapping";
+
+const Structure3DViewer = dynamic(() => import("@/components/Structure3DViewer"), {
+  ssr: false,
+});
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 type ExperimentalSnapshot = {
   method?: string;
@@ -41,7 +55,6 @@ type ExperimentalSnapshot = {
   r_free?: number | null;
   r_work?: number | null;
   release_date?: string;
-  starting_model?: string;
 };
 
 type ValidationData = {
@@ -58,7 +71,7 @@ type Macromolecule = {
   sequence_length: number | string;
   organism: string;
   details: string;
-  image_url?: string;
+  is_target?: boolean;
 };
 
 type PDBStructure = {
@@ -67,7 +80,9 @@ type PDBStructure = {
   method: string;
   resolution: number | null;
   release_date: string;
-  viewer_url?: string;
+  chains?: string[];
+  coverage_percent?: number | null;
+  coverage_ranges?: { start: number; end: number }[];
   experimental_snapshot?: ExperimentalSnapshot;
   validation?: ValidationData;
   macromolecules?: Macromolecule[];
@@ -76,20 +91,18 @@ type PDBStructure = {
 type PDBResponse = {
   accession?: string;
   count: number;
+  total_count?: number;
+  uniprot_length?: number;
   structures: PDBStructure[];
   error?: string;
 };
 
-type MembraneSegment = {
-  start: number;
-  end: number;
-  label?: string;
-};
+type MembraneSegment = { start: number; end: number; label?: string };
 
 type MembraneData = {
-  accession?: string;
-  is_membrane?: boolean;
-  predicted_type?: string;
+  method?: string;
+  is_membrane?: boolean | null;
+  predicted_type?: string | null;
   tm_segments?: MembraneSegment[];
   error?: string;
 };
@@ -98,609 +111,36 @@ type AlphaFoldData = {
   accession?: string;
   available: boolean;
   model_id?: string;
-  alphafold_id?: string;
   protein_name?: string;
   organism?: string;
   gene?: string;
   sequence?: string;
   sequence_length?: number;
   pdb_url?: string;
-  pdbUrl?: string;
   cif_url?: string;
-  pae_url?: string;
-  confidence?: number;
-  confidence_avg?: number;
-  created?: string;
+  pae_image_url?: string;
+  plddt_url?: string;
+  confidence?: number | null;
+  plddt_fractions?: {
+    very_high?: number | null;
+    confident?: number | null;
+    low?: number | null;
+    very_low?: number | null;
+  };
+  tool?: string;
   model_created?: string;
   latest_version?: number | string;
   error?: string;
 };
 
-type ActiveSource = "pdb" | "alphafold" | "ai";
-
-type ActiveTab =
-  | "overview"
-  | "viewer"
-  | "quality"
-  | "domains"
-  | "active-site"
-  | "comparison"
-  | "pdb";
-
-type HighlightRange = {
-  start: number;
-  end: number;
-  label?: string;
-  color?: string;
-};
-
-type QualityHighlightResponse = {
-  ramachandran?: {
-    highlight_ranges?: HighlightRange[];
-  };
-};
-
-export default function StructurePage() {
-  const params = useParams();
-  const router = useRouter();
-  const accession = String(params.accession || "");
-
-  const [loading, setLoading] = useState(false);
-
-  const [pdbData, setPdbData] = useState<PDBResponse | null>(null);
-  const [alphafold, setAlphafold] = useState<AlphaFoldData | null>(null);
-  const [membraneData, setMembraneData] = useState<MembraneData | null>(null);
-  const [qualityDataForInterpretation, setQualityDataForInterpretation] =
-    useState<any | null>(null);
-
-  const [selectedPdb, setSelectedPdb] = useState<PDBStructure | null>(null);
-  const [activeSource, setActiveSource] = useState<ActiveSource>("pdb");
-  const [activeTab, setActiveTab] = useState<ActiveTab>("overview");
-
-  const [activeRange, setActiveRange] = useState<HighlightRange | null>(null);
-  const [autoHighlightRanges, setAutoHighlightRanges] = useState<
-    HighlightRange[]
-  >([]);
-
-  useEffect(() => {
-    if (!accession) return;
-
-    const loadData = async () => {
-      setLoading(true);
-
-      try {
-        const [pdbRes, afRes, membraneRes] = await Promise.all([
-          fetch(`http://127.0.0.1:8000/api/pdb/${accession}`),
-          fetch(`http://127.0.0.1:8000/api/alphafold/${accession}`),
-          fetch(`http://127.0.0.1:8000/api/membrane/${accession}`),
-        ]);
-
-        const pdbJson: PDBResponse = await pdbRes.json();
-        const afJson: AlphaFoldData = await afRes.json();
-        const membraneJson: MembraneData = await membraneRes.json();
-
-        setPdbData(pdbJson);
-        setAlphafold(afJson);
-        setMembraneData(membraneJson);
-
-        if (pdbJson.structures?.length > 0) {
-          setSelectedPdb(pdbJson.structures[0]);
-          setActiveSource("pdb");
-        } else if (afJson.available) {
-          setActiveSource("alphafold");
-        } else {
-          setActiveSource("ai");
-        }
-      } catch (error) {
-        console.error("Erreur chargement structures:", error);
-      }
-
-      setLoading(false);
-    };
-
-    loadData();
-  }, [accession]);
-
-  useEffect(() => {
-    setActiveRange(null);
-  }, [activeSource, selectedPdb?.pdb_id, alphafold?.model_id]);
-
-  useEffect(() => {
-    if (!selectedPdb?.pdb_id) {
-      setAutoHighlightRanges([]);
-      setQualityDataForInterpretation(null);
-      return;
-    }
-
-    const loadQualityHighlights = async () => {
-      try {
-        const res = await fetch(
-          `http://127.0.0.1:8000/api/quality/${selectedPdb.pdb_id}`
-        );
-        const json: QualityHighlightResponse = await res.json();
-
-        setQualityDataForInterpretation(json);
-
-        const ranges = json.ramachandran?.highlight_ranges || [];
-
-        setAutoHighlightRanges(
-          ranges.map((range) => ({
-            ...range,
-            color:
-              range.label?.toLowerCase().includes("outlier")
-                ? "#ef4444"
-                : "#f59e0b",
-          }))
-        );
-      } catch (error) {
-        console.error("Erreur coloration automatique:", error);
-        setAutoHighlightRanges([]);
-        setQualityDataForInterpretation(null);
-      }
-    };
-
-    loadQualityHighlights();
-  }, [selectedPdb?.pdb_id]);
-
-  const alphafoldPdbUrl = alphafold?.pdb_url || alphafold?.pdbUrl;
-  const alphafoldConfidence =
-    alphafold?.confidence ?? alphafold?.confidence_avg ?? null;
-
-  const transmembraneRanges = useMemo<HighlightRange[]>(() => {
-    return (membraneData?.tm_segments || []).map((segment, index) => ({
-      start: segment.start,
-      end: segment.end,
-      label: segment.label || `TM${index + 1}`,
-      color: "#2563eb",
-    }));
-  }, [membraneData]);
-
-  const globalAutoRanges = useMemo(
-    () => [...transmembraneRanges, ...autoHighlightRanges],
-    [transmembraneRanges, autoHighlightRanges]
-  );
-
-  const viewerHighlightRanges = activeRange ? [activeRange] : [];
-
-  const bestResolution = useMemo(() => {
-    const values =
-      pdbData?.structures
-        ?.map((s) => s.resolution)
-        .filter((v): v is number => typeof v === "number") || [];
-
-    return values.length ? `${Math.min(...values)} Å` : "-";
-  }, [pdbData]);
-
-  const activeTitle =
-    activeSource === "pdb"
-      ? selectedPdb
-        ? `${selectedPdb.pdb_id} · ${selectedPdb.method || "PDB"}`
-        : "Aucune structure PDB"
-      : activeSource === "alphafold"
-      ? alphafold?.available
-        ? alphafold.model_id || alphafold.alphafold_id || "AlphaFold"
-        : "AlphaFold non disponible"
-      : "IA interne";
-
-  const snapshot = selectedPdb?.experimental_snapshot;
-  const validation = selectedPdb?.validation;
-  const macromolecules = selectedPdb?.macromolecules || [];
-
-  const openRangeInViewer = (range: HighlightRange, source: ActiveSource = "pdb") => {
-    setActiveSource(source);
-    setActiveRange(range);
-    setActiveTab("viewer");
-  };
-
-  return (
-    <div className="min-h-screen bg-[#eef2f6] text-slate-900">
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-[1440px] items-center justify-between px-4 py-2">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-[#0f4c81] p-2 text-white">
-              <Layers3 size={20} />
-            </div>
-
-            <div>
-              <p className="text-[15px] font-bold text-slate-900">
-                MemProtScope
-              </p>
-              <p className="text-[11px] text-slate-500">
-                Structure· PDB · AlphaFold · Membrane · Quality
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="rounded border border-slate-200 bg-slate-50 px-3 py-1 text-[12px] font-semibold text-slate-700">
-              UniProt: {accession}
-            </span>
-
-            <button
-              onClick={() => router.push(`/search?q=${accession}`)}
-              className="inline-flex items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-[12px] font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              <ArrowLeft size={14} />
-              Analyse
-            </button>
-          </div>
-        </div>
-
-        <div className="border-t border-slate-100 bg-white">
-          <div className="mx-auto flex max-w-[1440px] items-center gap-1 overflow-x-auto px-4 py-2">
-            <Tab label="Overview" active={activeTab === "overview"} onClick={() => setActiveTab("overview")} />
-            <Tab label="3D Viewer" active={activeTab === "viewer"} onClick={() => setActiveTab("viewer")} />
-            <Tab label="Quality" active={activeTab === "quality"} onClick={() => setActiveTab("quality")} />
-            <Tab label="Domains" active={activeTab === "domains"} onClick={() => setActiveTab("domains")} />
-            <Tab label="Active Site" active={activeTab === "active-site"} onClick={() => setActiveTab("active-site")} />
-            <Tab label="Comparison" active={activeTab === "comparison"} onClick={() => setActiveTab("comparison")} />
-            <Tab label="PDB entries" active={activeTab === "pdb"} onClick={() => setActiveTab("pdb")} />
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-[1440px] space-y-3 px-4 py-3">
-        {loading && (
-          <div className="flex items-center gap-2 rounded border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-            <Loader2 size={16} className="animate-spin" />
-            Chargement des données structurelles...
-          </div>
-        )}
-
-        <section className="grid grid-cols-12 gap-3">
-          <aside className="col-span-2 space-y-3">
-            <UniPanel title="Sources" icon={<Database size={15} />}>
-              <SourceCard
-                icon={<Database size={16} />}
-                title="PDB"
-                subtitle={`${pdbData?.count || 0} entrée(s)`}
-                active={activeSource === "pdb"}
-                onClick={() => setActiveSource("pdb")}
-              />
-
-              <SourceCard
-                icon={<Brain size={16} />}
-                title="AlphaFold"
-                subtitle={alphafold?.available ? "Disponible" : "Absent"}
-                active={activeSource === "alphafold"}
-                onClick={() => setActiveSource("alphafold")}
-              />
-
-              <SourceCard
-                icon={<Cpu size={16} />}
-                title="IA interne"
-                subtitle="À connecter"
-                active={activeSource === "ai"}
-                onClick={() => setActiveSource("ai")}
-              />
-            </UniPanel>
-
-            <UniPanel title="Résumé" icon={<ShieldCheck size={15} />}>
-              <InfoRow label="PDB entries" value={`${pdbData?.count || 0}`} />
-              <InfoRow label="Active PDB" value={selectedPdb?.pdb_id || "-"} />
-              <InfoRow label="Best resolution" value={bestResolution} />
-              <InfoRow
-                label="AlphaFold"
-                value={alphafold?.available ? "Available" : "Not found"}
-              />
-              <InfoRow
-                label="Mean pLDDT"
-                value={
-                  alphafoldConfidence !== null
-                    ? `${Math.round(alphafoldConfidence)}`
-                    : "-"
-                }
-              />
-              <InfoRow
-                label="TM segments"
-                value={`${membraneData?.tm_segments?.length || 0}`}
-              />
-            </UniPanel>
-
-            <UniPanel title="Légende 3D" icon={<Waves size={15} />}>
-              <Legend color="#2563eb" label="Transmembrane" />
-              <Legend color="#ef4444" label="Rama outlier" />
-              <Legend color="#f59e0b" label="Rama allowed" />
-              <Legend color="#e11d48" label="Site actif" />
-            </UniPanel>
-          </aside>
-
-          <section className="col-span-10 space-y-3">
-            {activeTab === "overview" && (
-              <OverviewTab
-                accession={accession}
-                activeSource={activeSource}
-                selectedPdb={selectedPdb}
-                alphafold={alphafold}
-                membraneData={membraneData}
-                qualityDataForInterpretation={qualityDataForInterpretation}
-                setActiveTab={setActiveTab}
-              />
-            )}
-
-            {activeTab === "viewer" && (
-              <ViewerCard
-                activeTitle={activeTitle}
-                activeSource={activeSource}
-                selectedPdb={selectedPdb}
-                alphafold={alphafold}
-                accession={accession}
-                alphafoldPdbUrl={alphafoldPdbUrl}
-                viewerHighlightRanges={viewerHighlightRanges}
-                autoHighlightRanges={globalAutoRanges}
-                membraneSegments={membraneData?.tm_segments || []}
-                activeRange={activeRange}
-                onFocusRange={(range) => {
-                  setActiveSource("pdb");
-                  setActiveRange(range);
-                }}
-                onClearFocus={() => setActiveRange(null)}
-              />
-            )}
-
-            {activeTab === "quality" && (
-              <div className="space-y-3">
-                <div className="grid grid-cols-12 gap-3">
-                  <div className="col-span-7">
-                    <ERRATQualityDashboard
-                      pdbId={selectedPdb?.pdb_id}
-                      onFocusRange={(range) => openRangeInViewer(range, "pdb")}
-                    />
-                  </div>
-
-                  <div className="col-span-5">
-  <MembraneOrientationPanel
-    accession={accession}
-    pdbId={selectedPdb?.pdb_id}
-    activeRange={activeRange}
-    onFocusRange={(range) => openRangeInViewer(range, "pdb")}
-  />
-</div>
-                </div>
-
-                <StructuralInterpretation
-                  activeSource={activeSource}
-                  selectedPdb={selectedPdb}
-                  alphafold={alphafold}
-                  activeRange={activeRange}
-                  onFocusRange={(range) => openRangeInViewer(range, activeSource)}
-                  onClearFocus={() => setActiveRange(null)}
-                />
-              </div>
-            )}
-
-            {activeTab === "domains" && (
-              <StructuralDomains
-                alphafold={alphafold}
-                activeSource={activeSource}
-                activeRange={activeRange}
-                onFocusRange={(range) => openRangeInViewer(range, "alphafold")}
-                onClearFocus={() => setActiveRange(null)}
-              />
-            )}
-
-            {activeTab === "active-site" && (
-              <ActiveSitePanel
-                pdbId={selectedPdb?.pdb_id}
-                activeRange={activeRange}
-                onFocusRange={(range) => openRangeInViewer(range, "pdb")}
-              />
-            )}
-
-            {activeTab === "comparison" && (
-              <MultiStructureComparison
-                accession={accession}
-                selectedPdb={selectedPdb}
-                alphafold={alphafold}
-                activeRange={activeRange}
-                autoHighlightRanges={globalAutoRanges}
-              />
-            )}
-
-            {activeTab === "pdb" && (
-              <div className="space-y-3">
-                {activeSource === "pdb" && selectedPdb && (
-                  <section className="grid grid-cols-2 gap-3">
-                    <ExperimentalSnapshotPanel snapshot={snapshot} />
-                    <ValidationPanel validation={validation} />
-                  </section>
-                )}
-
-                {activeSource === "alphafold" && alphafold?.available && (
-                  <AlphaFoldDetailsPanel
-                    alphafold={alphafold}
-                    accession={accession}
-                  />
-                )}
-
-                {activeSource === "pdb" && selectedPdb && (
-                  <MacromoleculesPanel macromolecules={macromolecules} />
-                )}
-
-                <PDBTable
-                  structures={pdbData?.structures || []}
-                  selected={selectedPdb}
-                  onSelect={(structure) => {
-                    setSelectedPdb(structure);
-                    setActiveSource("pdb");
-                    setActiveTab("viewer");
-                  }}
-                />
-              </div>
-            )}
-          </section>
-        </section>
-      </main>
-    </div>
-  );
-}
-
-function OverviewTab({
-  accession,
-  activeSource,
-  selectedPdb,
-  alphafold,
-  membraneData,
-  qualityDataForInterpretation,
-  setActiveTab,
-}: {
+type UniProtData = {
   accession: string;
-  activeSource: ActiveSource;
-  selectedPdb: PDBStructure | null;
-  alphafold: AlphaFoldData | null;
-  membraneData: MembraneData | null;
-  qualityDataForInterpretation: any | null;
-  setActiveTab: (tab: ActiveTab) => void;
-}) {
-  return (
-    <div className="space-y-3">
-      <AutoScientificInterpretation
-        accession={accession}
-        activeSource={activeSource}
-        selectedPdb={selectedPdb}
-        alphafold={alphafold}
-        membraneData={membraneData}
-        qualityData={qualityDataForInterpretation}
-      />
-
-      <section className="grid grid-cols-4 gap-3">
-        <FeatureCard
-          title="3D Viewer"
-          text="Visualisation colorée avec segments TM, outliers et régions ciblées."
-          onClick={() => setActiveTab("viewer")}
-        />
-        <FeatureCard
-          title="Quality"
-          text="Ramachandran réel, ERRAT automatique, géométrie et validation."
-          onClick={() => setActiveTab("quality")}
-        />
-        <FeatureCard
-          title="Membrane"
-          text="Segments transmembranaires et interprétation membranaire."
-        />
-        <FeatureCard
-          title="Active Site"
-          text="Ligands PDB et résidus proches reliés au viewer 3D."
-          onClick={() => setActiveTab("active-site")}
-        />
-      </section>
-    </div>
-  );
-}
-
-function ViewerCard({
-  activeTitle,
-  activeSource,
-  selectedPdb,
-  alphafold,
-  accession,
-  alphafoldPdbUrl,
-  viewerHighlightRanges,
-  autoHighlightRanges,
-  membraneSegments,
-  activeRange,
-  onFocusRange,
-  onClearFocus,
-}: {
-  activeTitle: string;
-  activeSource: ActiveSource;
-  selectedPdb: PDBStructure | null;
-  alphafold: AlphaFoldData | null;
-  accession: string;
-  alphafoldPdbUrl?: string;
-  viewerHighlightRanges: HighlightRange[];
-  autoHighlightRanges: HighlightRange[];
-  membraneSegments: MembraneSegment[];
-  activeRange: HighlightRange | null;
-  onFocusRange: (range: HighlightRange) => void;
-  onClearFocus: () => void;
-}) {
-  return (
-    <section className="overflow-hidden rounded border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-slate-200 bg-[#f8fafc] px-4 py-3">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
-            3D viewer · structure · Ramachandran · TM segments
-          </p>
-          <h1 className="text-[15px] font-bold text-slate-900">
-            {activeTitle}
-          </h1>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {activeSource === "pdb" && selectedPdb && (
-            <a
-              href={`https://www.rcsb.org/structure/${selectedPdb.pdb_id}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 rounded border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-semibold text-blue-700"
-            >
-              RCSB
-              <ExternalLink size={12} />
-            </a>
-          )}
-
-          {activeSource === "alphafold" && alphafold?.available && (
-            <a
-              href={`https://alphafold.ebi.ac.uk/entry/${accession}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 rounded border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-semibold text-violet-700"
-            >
-              AlphaFold DB
-              <ExternalLink size={12} />
-            </a>
-          )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-12 gap-0">
-        <div className="col-span-8 border-r border-slate-200">
-          <div className="h-[500px] bg-white">
-            {activeSource === "pdb" && selectedPdb ? (
-              <Structure3DViewer
-                pdbId={selectedPdb.pdb_id}
-                mode="pdb"
-                highlightRanges={viewerHighlightRanges}
-                autoHighlightRanges={autoHighlightRanges}
-              />
-            ) : activeSource === "alphafold" &&
-              alphafold?.available &&
-              alphafoldPdbUrl ? (
-              <Structure3DViewer
-                pdbUrl={alphafoldPdbUrl}
-                mode="alphafold"
-                highlightRanges={viewerHighlightRanges}
-                autoHighlightRanges={autoHighlightRanges}
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center text-sm text-slate-400">
-                Aucun modèle disponible pour cette source.
-              </div>
-            )}
-          </div>
-        </div>
-
-        <aside className="col-span-4 bg-slate-50 p-3">
-          <CompactRamachandranOnly
-            pdbId={selectedPdb?.pdb_id}
-            activeRange={activeRange}
-            onFocusRange={onFocusRange}
-            onClearFocus={onClearFocus}
-          />
-        </aside>
-      </div>
-
-      <div className="border-t border-slate-200 bg-white p-3">
-        <HorizontalTMSegments
-          segments={membraneSegments}
-          activeRange={activeRange}
-          onFocusRange={onFocusRange}
-        />
-      </div>
-    </section>
-  );
-}
+  available?: boolean;
+  protein_name?: string;
+  organism?: string;
+  gene_names?: string[];
+  length?: number;
+};
 
 type RamaPoint = {
   chain: string;
@@ -711,7 +151,17 @@ type RamaPoint = {
   status: "favored" | "allowed" | "outlier";
 };
 
-type RamaData = {
+type ContactWindow = {
+  chain?: string;
+  start: number;
+  end: number;
+  error_value: number;
+  status: "good" | "warning" | "bad";
+};
+
+type QualityData = {
+  pdb_id?: string;
+  error?: string;
   ramachandran?: {
     favored_percent?: number | null;
     allowed_percent?: number | null;
@@ -721,1255 +171,1686 @@ type RamaData = {
     points?: RamaPoint[];
     highlight_ranges?: HighlightRange[];
   };
-};
-
-function CompactRamachandranOnly({
-  pdbId,
-  activeRange,
-  onFocusRange,
-  onClearFocus,
-}: {
-  pdbId?: string | null;
-  activeRange: HighlightRange | null;
-  onFocusRange: (range: HighlightRange) => void;
-  onClearFocus: () => void;
-}) {
-  const [data, setData] = useState<RamaData | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!pdbId) {
-      setData(null);
-      return;
-    }
-
-    const load = async () => {
-      setLoading(true);
-
-      try {
-        const res = await fetch(`http://127.0.0.1:8000/api/quality/${pdbId}`);
-        const json = await res.json();
-        setData(json);
-      } catch (error) {
-        console.error("Erreur Ramachandran compact:", error);
-        setData(null);
-      }
-
-      setLoading(false);
-    };
-
-    load();
-  }, [pdbId]);
-
-  const rama = data?.ramachandran;
-  const points = rama?.points || [];
-
-  return (
-    <section className="h-full rounded border border-slate-200 bg-white p-3">
-      <div className="mb-3 flex items-center justify-between">
-        <div>
-          <h2 className="text-[13px] font-bold text-slate-900">
-            Ramachandran réel
-          </h2>
-          <p className="text-[10px] text-slate-500">
-            Angles φ/ψ calculés depuis la structure PDB
-          </p>
-        </div>
-
-        {activeRange && (
-          <button
-            onClick={onClearFocus}
-            className="rounded bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600"
-          >
-            reset
-          </button>
-        )}
-      </div>
-
-      {loading ? (
-        <div className="flex h-[350px] items-center justify-center text-[12px] text-slate-500">
-          Chargement du Ramachandran...
-        </div>
-      ) : (
-        <>
-          <RamachandranPlotOnly points={points} onFocusRange={onFocusRange} />
-
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            <MiniStat
-              label="Favored"
-              value={
-                rama?.favored_percent !== undefined &&
-                rama?.favored_percent !== null
-                  ? `${rama.favored_percent}%`
-                  : "-"
-              }
-            />
-            <MiniStat
-              label="Allowed"
-              value={
-                rama?.allowed_percent !== undefined &&
-                rama?.allowed_percent !== null
-                  ? `${rama.allowed_percent}%`
-                  : "-"
-              }
-            />
-            <MiniStat
-              label="Outliers"
-              value={
-                rama?.outliers_percent !== undefined &&
-                rama?.outliers_percent !== null
-                  ? `${rama.outliers_percent}%`
-                  : "-"
-              }
-            />
-          </div>
-
-          <p className="mt-3 rounded border border-slate-100 bg-slate-50 p-2 text-[11px] leading-5 text-slate-600">
-            {rama?.interpretation ||
-              "Clique sur un point du graphe pour voir le résidu correspondant dans la structure 3D."}
-          </p>
-
-          {rama?.highlight_ranges && rama.highlight_ranges.length > 0 && (
-            <div className="mt-3 flex max-h-[75px] flex-wrap gap-2 overflow-auto">
-              {rama.highlight_ranges.slice(0, 10).map((range, index) => (
-                <button
-                  key={`${range.start}-${range.end}-${index}`}
-                  onClick={() => onFocusRange(range)}
-                  className={`rounded border px-2 py-1 text-[10px] font-semibold ${
-                    activeRange?.start === range.start &&
-                    activeRange?.end === range.end
-                      ? "border-red-300 bg-red-50 text-red-800"
-                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                  }`}
-                >
-                  {range.start}-{range.end}
-                </button>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-    </section>
-  );
-}
-
-function RamachandranPlotOnly({
-  points,
-  onFocusRange,
-}: {
-  points: RamaPoint[];
-  onFocusRange: (range: HighlightRange) => void;
-}) {
-  const sampled =
-    points.length > 500 ? points.filter((_, index) => index % 2 === 0) : points;
-
-  return (
-    <div className="relative h-[275px] rounded border border-slate-200 bg-white">
-      <div className="absolute left-[18%] top-[18%] h-[34%] w-[34%] rounded-full bg-emerald-100" />
-      <div className="absolute right-[14%] bottom-[16%] h-[32%] w-[32%] rounded-full bg-emerald-100" />
-      <div className="absolute left-[35%] bottom-[8%] h-[22%] w-[22%] rounded-full bg-blue-100" />
-
-      <div className="absolute left-7 right-3 top-1/2 border-t border-slate-300" />
-      <div className="absolute bottom-6 top-3 left-1/2 border-l border-slate-300" />
-
-      <div className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[10px] font-semibold text-slate-500">
-        φ phi
-      </div>
-      <div className="absolute left-1 top-1/2 -translate-y-1/2 -rotate-90 text-[10px] font-semibold text-slate-500">
-        ψ psi
-      </div>
-
-      {sampled.map((point, index) => {
-        const x = ((point.phi + 180) / 360) * 100;
-        const y = ((180 - point.psi) / 360) * 100;
-
-        const color =
-          point.status === "favored"
-            ? "bg-emerald-600"
-            : point.status === "allowed"
-            ? "bg-amber-500"
-            : "bg-red-500";
-
-        return (
-          <button
-            key={`${point.chain}-${point.resi}-${index}`}
-            onClick={() =>
-              onFocusRange({
-                start: point.resi,
-                end: point.resi,
-                label: `${point.resn}${point.resi} · ${point.status}`,
-                color: point.status === "outlier" ? "#ef4444" : "#f59e0b",
-              })
-            }
-            className={`absolute h-2 w-2 rounded-full ${color} ring-1 ring-white hover:scale-150`}
-            style={{ left: `${x}%`, top: `${y}%` }}
-            title={`${point.resn}${point.resi} φ=${point.phi} ψ=${point.psi}`}
-          />
-        );
-      })}
-
-      <div className="absolute right-2 top-2 rounded bg-white/90 px-2 py-1 text-[10px]">
-        <span className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-600" />
-        Favored
-        <span className="ml-2 mr-1 inline-block h-2 w-2 rounded-full bg-amber-500" />
-        Allowed
-        <span className="ml-2 mr-1 inline-block h-2 w-2 rounded-full bg-red-500" />
-        Outlier
-      </div>
-    </div>
-  );
-}
-
-function HorizontalTMSegments({
-  segments,
-  activeRange,
-  onFocusRange,
-}: {
-  segments: MembraneSegment[];
-  activeRange: HighlightRange | null;
-  onFocusRange: (range: HighlightRange) => void;
-}) {
-  return (
-    <section>
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Waves size={16} className="text-[#0f4c81]" />
-          <div>
-            <h2 className="text-[13px] font-bold text-slate-900">
-              Segments transmembranaires
-            </h2>
-            <p className="text-[10px] text-slate-500">
-              Chaque segment est affiché sur une ligne horizontale, empilé verticalement.
-            </p>
-          </div>
-        </div>
-
-        <span className="rounded bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-800">
-          {segments.length} segment(s)
-        </span>
-      </div>
-
-      {segments.length > 0 ? (
-        <div className="grid grid-cols-12 gap-3">
-          <div className="col-span-7 space-y-2">
-            {segments.map((segment, index) => (
-              <button
-                key={`${segment.start}-${segment.end}-${index}`}
-                onClick={() =>
-                  onFocusRange({
-                    start: segment.start,
-                    end: segment.end,
-                    label: segment.label || `TM${index + 1}`,
-                    color: "#2563eb",
-                  })
-                }
-                className={`flex w-full items-center justify-between rounded border px-3 py-2 text-left text-[12px] transition ${
-                  activeRange?.start === segment.start &&
-                  activeRange?.end === segment.end
-                    ? "border-blue-400 bg-blue-50 text-blue-900"
-                    : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-white"
-                }`}
-              >
-                <span className="flex items-center gap-2 font-bold">
-                  <span className="h-3 w-3 rounded bg-blue-600" />
-                  {segment.label || `TM${index + 1}`}
-                </span>
-
-                <span className="rounded bg-white px-2 py-1 text-[11px] font-semibold text-slate-700">
-                  Résidus {segment.start}–{segment.end}
-                </span>
-              </button>
-            ))}
-          </div>
-
-          <div className="col-span-5 rounded border border-blue-100 bg-blue-50 p-3">
-            <p className="text-[12px] font-bold text-blue-900">
-              Interprétation biologique
-            </p>
-
-            <p className="mt-1 text-[12px] leading-5 text-blue-900">
-              Les segments bleus correspondent aux régions hydrophobes qui
-              traversent probablement la bicouche lipidique.
-              
-            </p>
-
-            <p className="mt-2 rounded bg-white px-2 py-1 text-[11px] text-slate-700">
-              Lecture 3D : bleu = segment transmembranaire ; rouge = résidu
-              Ramachandran outlier ; orange = conformation tolérée.
-            </p>
-          </div>
-        </div>
-      ) : (
-        <div className="rounded border border-amber-100 bg-amber-50 p-3 text-[12px] text-amber-900">
-          Aucun segment transmembranaire détecté.
-        </div>
-      )}
-    </section>
-  );
-}
-
-
-type OPMRealData = {
-  pdb_id?: string;
-  available?: boolean;
-  url?: string;
-  title?: string;
-  message?: string;
-  classification?: Record<string, string>;
-  coordinate_links?: { url: string; label?: string }[];
-};
-
-function OPMQualityCardReal({
-  pdbId,
-  segments,
-  activeRange,
-  onFocusRange,
-}: {
-  pdbId?: string | null;
-  segments: MembraneSegment[];
-  activeRange: HighlightRange | null;
-  onFocusRange: (range: HighlightRange) => void;
-}) {
-  const [loading, setLoading] = useState(false);
-  const [opm, setOpm] = useState<OPMRealData | null>(null);
-
-  useEffect(() => {
-    if (!pdbId) {
-      setOpm(null);
-      return;
-    }
-
-    const load = async () => {
-      setLoading(true);
-
-      try {
-        const res = await fetch(`http://127.0.0.1:8000/api/opm/${pdbId}`);
-        const json = await res.json();
-        setOpm(json);
-      } catch (error) {
-        console.error("Erreur OPM réel:", error);
-        setOpm({
-          pdb_id: pdbId,
-          available: false,
-          url: `https://opm.phar.umich.edu/proteins/${pdbId.toLowerCase()}`,
-          message:
-            "Impossible de contacter /api/opm. Vérifie que la route OPM est ajoutée dans le backend.",
-        });
-      }
-
-      setLoading(false);
-    };
-
-    load();
-  }, [pdbId]);
-
-  return (
-    <section className="rounded border border-blue-100 bg-white p-3 shadow-sm">
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Waves size={17} className="text-[#0f4c81]" />
-          <div>
-            <h2 className="text-[14px] font-bold text-slate-900">
-              OPM réel · orientation membranaire
-            </h2>
-            <p className="text-[11px] text-slate-500">
-              Orientation membranaire et segments TM reliés au viewer 3D.
-            </p>
-          </div>
-        </div>
-
-        {pdbId && (
-          <a
-            href={`https://opm.phar.umich.edu/proteins/${pdbId.toLowerCase()}`}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 rounded bg-[#0f4c81] px-3 py-1 text-[11px] font-semibold text-white"
-          >
-            OPM
-            <ExternalLink size={12} />
-          </a>
-        )}
-      </div>
-
-      {loading ? (
-        <div className="flex h-[160px] items-center justify-center text-[12px] text-slate-500">
-          Chargement OPM réel...
-        </div>
-      ) : (
-        <>
-          <div className="mb-3 rounded border border-slate-200 bg-slate-50 p-3">
-            <div className="flex items-center justify-between">
-              <p className="text-[12px] font-bold text-slate-900">
-                Statut OPM
-              </p>
-              <span
-                className={`rounded px-2 py-1 text-[10px] font-bold ${
-                  opm?.available
-                    ? "bg-emerald-100 text-emerald-800"
-                    : "bg-amber-100 text-amber-800"
-                }`}
-              >
-                {opm?.available ? "Disponible" : "À vérifier"}
-              </span>
-            </div>
-
-            <p className="mt-2 text-[12px] leading-5 text-slate-700">
-              {opm?.message ||
-                "OPM replace la structure dans le contexte de la bicouche lipidique."}
-            </p>
-          </div>
-
-          {opm?.classification && Object.keys(opm.classification).length > 0 && (
-            <div className="mb-3 grid grid-cols-2 gap-2">
-              {Object.entries(opm.classification).map(([key, value]) => (
-                <div key={key} className="rounded border border-slate-200 bg-white p-2">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
-                    {key}
-                  </p>
-                  <p className="text-[12px] font-semibold text-slate-800">
-                    {value}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="relative h-[190px] overflow-hidden rounded border border-blue-100 bg-white">
-            <div className="absolute left-0 right-0 top-[42px] h-[18px] bg-blue-100" />
-            <div className="absolute left-0 right-0 bottom-[42px] h-[18px] bg-blue-100" />
-            <div className="absolute left-0 right-0 top-[60px] h-[70px] bg-gradient-to-b from-orange-50 via-orange-100 to-orange-50" />
-
-            <div className="absolute left-4 top-3 rounded bg-white/90 px-2 py-1 text-[10px] font-semibold text-blue-900">
-              Extracellulaire
-            </div>
-
-            <div className="absolute bottom-3 left-4 rounded bg-white/90 px-2 py-1 text-[10px] font-semibold text-blue-900">
-              Cytoplasmique
-            </div>
-
-            <div className="absolute right-4 top-3 rounded bg-[#0f4c81] px-2 py-1 text-[10px] font-bold text-white">
-              {pdbId || "PDB"}
-            </div>
-
-            {segments.length > 0 ? (
-              <div className="absolute inset-x-0 top-[50px] flex h-[88px] items-center justify-center gap-3">
-                {segments.slice(0, 8).map((segment, index) => (
-                  <button
-                    key={`${segment.start}-${segment.end}-${index}`}
-                    onClick={() =>
-                      onFocusRange({
-                        start: segment.start,
-                        end: segment.end,
-                        label: segment.label || `TM${index + 1}`,
-                        color: "#2563eb",
-                      })
-                    }
-                    className={`h-[86px] w-[20px] rounded-full transition ${
-                      activeRange?.start === segment.start &&
-                      activeRange?.end === segment.end
-                        ? "bg-blue-800 ring-4 ring-blue-200"
-                        : "bg-blue-600 hover:bg-blue-700"
-                    }`}
-                    title={`${segment.label || `TM${index + 1}`} ${segment.start}-${segment.end}`}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center text-[12px] text-slate-400">
-                Aucun segment TM détecté
-              </div>
-            )}
-          </div>
-
-          <div className="mt-3 space-y-2">
-            {segments.length > 0 ? (
-              segments.map((segment, index) => (
-                <button
-                  key={`${segment.start}-${segment.end}-opm-${index}`}
-                  onClick={() =>
-                    onFocusRange({
-                      start: segment.start,
-                      end: segment.end,
-                      label: segment.label || `TM${index + 1}`,
-                      color: "#2563eb",
-                    })
-                  }
-                  className={`flex w-full items-center justify-between rounded border px-3 py-2 text-left text-[12px] ${
-                    activeRange?.start === segment.start &&
-                    activeRange?.end === segment.end
-                      ? "border-blue-400 bg-blue-50 text-blue-900"
-                      : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-white"
-                  }`}
-                >
-                  <span className="flex items-center gap-2 font-bold">
-                    <span className="h-3 w-3 rounded bg-blue-600" />
-                    {segment.label || `TM${index + 1}`}
-                  </span>
-                  <span className="text-[11px]">Résidus {segment.start}–{segment.end}</span>
-                </button>
-              ))
-            ) : (
-              <p className="rounded border border-amber-100 bg-amber-50 p-3 text-[12px] leading-5 text-amber-900">
-                Aucun segment transmembranaire détecté.
-              </p>
-            )}
-          </div>
-        </>
-      )}
-    </section>
-  );
-}
-
-
-type ERRATWindow = {
-  start: number;
-  end: number;
-  error_value: number;
-  status: "good" | "warning" | "bad";
-};
-
-type ERRATQualityData = {
-  errat?: {
-    available?: boolean;
-    score?: number | null;
-    method?: string;
-    all_windows?: ERRATWindow[];
-    windows?: ERRATWindow[];
-    bad_windows?: ERRATWindow[];
-    warning_windows?: ERRATWindow[];
-    highlight_ranges?: HighlightRange[];
-    interpretation?: string;
-  };
   geometry?: {
+    available?: boolean;
     clashscore?: number | null;
     sidechain_outliers_percent?: number | null;
     rsrz_outliers_percent?: number | null;
     rcsb_ramachandran_outliers_percent?: number | null;
   };
+  errat?: {
+    available?: boolean;
+    score?: number | null;
+    method?: string;
+    all_windows?: ContactWindow[];
+    bad_windows?: ContactWindow[];
+    warning_windows?: ContactWindow[];
+    interpretation?: string;
+  };
 };
 
-function ERRATQualityDashboard({
-  pdbId,
-  onFocusRange,
-}: {
-  pdbId?: string | null;
-  onFocusRange: (range: HighlightRange) => void;
-}) {
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<ERRATQualityData | null>(null);
+type HighlightRange = NumberedRange;
+
+type Source = "pdb" | "alphafold";
+
+type TabKey =
+  | "overview"
+  | "viewer"
+  | "quality"
+  | "membrane"
+  | "domains"
+  | "active-site"
+  | "comparison"
+  | "entries";
+
+const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
+  { key: "overview", label: "Vue d’ensemble", icon: <LayoutDashboard size={14} /> },
+  { key: "viewer", label: "Visualisation 3D", icon: <Boxes size={14} /> },
+  { key: "quality", label: "Qualité", icon: <ShieldCheck size={14} /> },
+  { key: "membrane", label: "Membrane", icon: <Waves size={14} /> },
+  { key: "domains", label: "Domaines", icon: <Dna size={14} /> },
+  { key: "active-site", label: "Site actif", icon: <Crosshair size={14} /> },
+  { key: "comparison", label: "PDB / AlphaFold", icon: <GitCompare size={14} /> },
+  { key: "entries", label: "Entrées PDB", icon: <Database size={14} /> },
+];
+
+// Couleurs officielles AlphaFold DB pour le pLDDT
+const PLDDT_BANDS = [
+  { key: "very_high", label: "Très élevé (> 90)", color: "#0053d6" },
+  { key: "confident", label: "Confiant (70–90)", color: "#65cbf3" },
+  { key: "low", label: "Faible (50–70)", color: "#ffdb13" },
+  { key: "very_low", label: "Très faible (< 50)", color: "#ff7d45" },
+] as const;
+
+const RAMA_COLORS = { favored: "#16a34a", allowed: "#d97706", outlier: "#dc2626" } as const;
+const RAMA_LABELS = { favored: "Favorable", allowed: "Autorisé", outlier: "Hors régions" } as const;
+
+const fmt = (value?: number | null, digits = 1, suffix = "") =>
+  value == null
+    ? "—"
+    : `${value.toLocaleString("fr-FR", { maximumFractionDigits: digits })}${suffix}`;
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
+export default function StructurePage() {
+  const params = useParams();
+  const accession = String(params.accession || "").toUpperCase();
+
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [uniprot, setUniprot] = useState<UniProtData | null>(null);
+  const [pdbData, setPdbData] = useState<PDBResponse | null>(null);
+  const [alphafold, setAlphafold] = useState<AlphaFoldData | null>(null);
+  const [membraneData, setMembraneData] = useState<MembraneData | null>(null);
+  const [quality, setQuality] = useState<QualityData | null>(null);
+  const [loadingQuality, setLoadingQuality] = useState(false);
+  const [mapping, setMapping] = useState<ResidueMapping | null>(null);
+
+  const [selectedPdb, setSelectedPdb] = useState<PDBStructure | null>(null);
+  const [source, setSource] = useState<Source>("pdb");
+  const [tab, setTab] = useState<TabKey>("overview");
+  const [activeRange, setActiveRange] = useState<HighlightRange | null>(null);
 
   useEffect(() => {
-    if (!pdbId) {
-      setData(null);
-      return;
-    }
+    if (!accession) return;
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
 
-    const load = async () => {
-      setLoading(true);
+    const getJson = (path: string) => fetch(`${API_BASE}${path}`).then((r) => r.json());
 
-      try {
-        const res = await fetch(`http://127.0.0.1:8000/api/quality/${pdbId}`);
-        const json = await res.json();
-        setData(json);
-      } catch (error) {
-        console.error("Erreur ERRAT:", error);
-        setData(null);
+    Promise.allSettled([
+      getJson(`/api/uniprot/${accession}`),
+      getJson(`/api/pdb/${accession}`),
+      getJson(`/api/alphafold/${accession}`),
+      getJson(`/api/membrane/${accession}`),
+    ]).then(([uni, pdb, af, mem]) => {
+      if (cancelled) return;
+      if ([uni, pdb, af, mem].every((r) => r.status === "rejected")) {
+        setLoadError("Impossible de joindre le serveur d’analyse.");
       }
+      if (uni.status === "fulfilled") setUniprot(uni.value);
+      const pdbJson: PDBResponse | null = pdb.status === "fulfilled" ? pdb.value : null;
+      const afJson: AlphaFoldData | null = af.status === "fulfilled" ? af.value : null;
+      setPdbData(pdbJson);
+      setAlphafold(afJson);
+      if (mem.status === "fulfilled") setMembraneData(mem.value);
 
+      if (pdbJson?.structures?.length) {
+        // Structure demandée dans l'adresse (?pdb=), sinon la mieux classée
+        const wanted = new URLSearchParams(window.location.search).get("pdb")?.toUpperCase();
+        setSelectedPdb(pdbJson.structures.find((s) => s.pdb_id === wanted) ?? pdbJson.structures[0]);
+        setSource("pdb");
+      } else if (afJson?.available) {
+        setSource("alphafold");
+      }
       setLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
     };
+  }, [accession]);
 
-    load();
-  }, [pdbId]);
+  // Une seule requête qualité par structure, partagée par tous les onglets
+  useEffect(() => {
+    setQuality(null);
+    if (!selectedPdb?.pdb_id) return;
+    let cancelled = false;
+    setLoadingQuality(true);
+    fetch(`${API_BASE}/api/quality/${selectedPdb.pdb_id}`)
+      .then((r) => r.json())
+      .then((json) => !cancelled && setQuality(json))
+      .catch(() => !cancelled && setQuality(null))
+      .finally(() => !cancelled && setLoadingQuality(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPdb?.pdb_id]);
 
-  const score = data?.errat?.score ?? null;
+  // Correspondance de numérotation UniProt → structure sélectionnée (SIFTS)
+  useEffect(() => {
+    setMapping(null);
+    if (!selectedPdb?.pdb_id || !accession) return;
+    let cancelled = false;
+    fetch(`${API_BASE}/api/mapping/${selectedPdb.pdb_id}/${accession}`)
+      .then((r) => r.json())
+      .then((json) => !cancelled && setMapping(json))
+      .catch(() => !cancelled && setMapping(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPdb?.pdb_id, accession]);
 
-  const badWindows = data?.errat?.bad_windows || [];
-  const warningWindows = data?.errat?.warning_windows || [];
+  useEffect(() => {
+    setActiveRange(null);
+  }, [source, selectedPdb?.pdb_id]);
 
-  const graphWindows = buildERRATGraphWindows({
-    score,
-    allWindows: data?.errat?.all_windows || data?.errat?.windows || [],
-    badWindows,
-    warningWindows,
-  });
+  const structures = pdbData?.structures ?? [];
+  const tmSegments = membraneData?.tm_segments ?? [];
+  const proteinLength = uniprot?.length || pdbData?.uniprot_length || alphafold?.sequence_length || 0;
+  const proteinName = uniprot?.protein_name || alphafold?.protein_name || accession;
+  const organism = uniprot?.organism || alphafold?.organism;
+  const gene = uniprot?.gene_names?.[0] || alphafold?.gene;
 
-  if (!pdbId) {
-    return (
-      <section className="rounded border border-slate-200 bg-white p-3 shadow-sm">
-        <ERRATHeader />
-        <div className="rounded border border-amber-100 bg-amber-50 p-3 text-[12px] text-amber-900">
-          Sélectionne une structure PDB pour calculer le score ERRAT automatique.
-        </div>
-      </section>
-    );
-  }
+  const bestResolution = useMemo(() => {
+    const values = structures
+      .map((s) => s.resolution)
+      .filter((v): v is number => typeof v === "number");
+    return values.length ? Math.min(...values) : null;
+  }, [structures]);
+
+  const tmRanges = useMemo<HighlightRange[]>(
+    () =>
+      tmSegments.map((s, i) => ({
+        start: s.start,
+        end: s.end,
+        label: s.label || `TM${i + 1}`,
+        color: "#d97706",
+      })),
+    [tmSegments]
+  );
+
+  const qualityRanges = useMemo<HighlightRange[]>(
+    () =>
+      (quality?.ramachandran?.highlight_ranges ?? [])
+        .filter((r) => r.label?.toLowerCase().includes("outlier"))
+        .map((r) => ({ ...r, color: RAMA_COLORS.outlier, numbering: "pdb" as const })),
+    [quality]
+  );
+
+  const focus = (range: HighlightRange, target?: Source) => {
+    if (target) setSource(target);
+    setActiveRange(range);
+    setTab("viewer");
+  };
+
+  const selectStructure = (structure: PDBStructure, openViewer = false) => {
+    setSelectedPdb(structure);
+    setSource("pdb");
+    if (openViewer) setTab("viewer");
+  };
 
   return (
-    <section className="rounded border border-slate-200 bg-white p-3 shadow-sm">
-      <ERRATHeader />
+    <div className="flex min-h-screen flex-col bg-[#eef2f6] text-slate-900">
+      <SiteHeader />
 
-      {loading ? (
-        <div className="flex h-[260px] items-center justify-center text-[12px] text-slate-500">
-          Calcul / chargement ERRAT automatique...
-        </div>
-      ) : (
-        <div className="grid grid-cols-12 gap-3">
-          <div className="col-span-5 rounded border border-slate-200 bg-slate-50 p-3">
-            <p className="mb-2 text-[12px] font-bold text-slate-900">
-              Quality factor
-            </p>
+      <section className={HERO_BG}>
+        <div aria-hidden className={HERO_GLOW} />
+        <div className="relative w-full px-4 py-5 lg:px-6">
+          <nav className="flex flex-wrap items-center gap-1 text-[13px] text-blue-200">
+            <Link href="/" className="hover:text-white">
+              Accueil
+            </Link>
+            <ChevronRight size={12} />
+            <Link href={`/search?q=${accession}`} className="hover:text-white">
+              Analyse de séquence
+            </Link>
+            <ChevronRight size={12} />
+            <span className="text-white">Structures</span>
+            <ChevronRight size={12} />
+            <span className="font-mono text-cyan-200">{accession}</span>
+          </nav>
 
-            <ERRATGaugeProfessional score={score} />
-
-            <p className="mt-3 rounded border border-slate-200 bg-white p-3 text-[12px] leading-5 text-slate-700">
-              {data?.errat?.interpretation ||
-                "Le score ERRAT automatique évalue les fenêtres présentant des contacts atomiques non liés défavorables."}
-            </p>
-
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              <MiniStat label="Bad windows" value={`${badWindows.length}`} />
-              <MiniStat label="Warning" value={`${warningWindows.length}`} />
-              <MiniStat label="Method" value={data?.errat?.method ? "local" : "-"} />
-            </div>
-          </div>
-
-          <div className="col-span-7 rounded border border-slate-200 bg-white p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-[12px] font-bold text-slate-900">
-                Graphique ERRAT par fenêtres
-              </p>
-
-              <div className="flex items-center gap-2">
-                <ERRATLegend color="bg-emerald-500" label="Bon" />
-                <ERRATLegend color="bg-amber-400" label="Warning" />
-                <ERRATLegend color="bg-red-500" label="Bad" />
+          <div className="mt-2 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded bg-white/15 px-2 py-0.5 font-mono text-[14px] font-semibold text-white">
+                  {accession}
+                </span>
+                {gene && (
+                  <span className="rounded bg-cyan-400/20 px-2 py-0.5 font-mono text-[13px] font-semibold text-cyan-100">
+                    {gene}
+                  </span>
+                )}
               </div>
+              <h1 className="mt-1.5 text-[26px] font-bold leading-tight tracking-tight text-white sm:text-[30px]">
+                {proteinName}
+              </h1>
+              {organism && <p className="text-[15px] italic text-blue-100">{organism}</p>}
             </div>
-
-            <ERRATWindowChart
-              windows={graphWindows}
-              onFocusRange={onFocusRange}
-            />
-
-            <div className="mt-3 rounded border border-slate-100 bg-slate-50 p-2 text-[11px] leading-5 text-slate-600">
-              Vert = fenêtre correcte ; orange = fenêtre à surveiller ; rouge =
-              fenêtre problématique. Clique sur une barre pour visualiser la
-              région dans la structure 3D.
-            </div>
-          </div>
-
-          <div className="col-span-12 rounded border border-slate-200 bg-slate-50 p-3">
-            <p className="mb-2 text-[12px] font-bold text-slate-900">
-              Géométrie structurale complémentaire
-            </p>
-
-            <div className="grid grid-cols-4 gap-2">
-              <GeometryMini
-                label="Clashscore"
-                value={data?.geometry?.clashscore}
-                suffix=""
+            <div className="flex flex-wrap gap-2">
+              <SaveToProject
+                variant="dark"
+                kind="structure"
+                title={`${proteinName}${source === "pdb" && selectedPdb ? ` · ${selectedPdb.pdb_id}` : " · AlphaFold"}`}
+                payload={{
+                  accession,
+                  protein_name: proteinName,
+                  pdb_id: source === "pdb" ? selectedPdb?.pdb_id : undefined,
+                  source,
+                  length: proteinLength || undefined,
+                }}
               />
-              <GeometryMini
-                label="Sidechain outliers"
-                value={data?.geometry?.sidechain_outliers_percent}
-                suffix="%"
-              />
-              <GeometryMini
-                label="RSRZ outliers"
-                value={data?.geometry?.rsrz_outliers_percent}
-                suffix="%"
-              />
-              <GeometryMini
-                label="Rama outliers wwPDB"
-                value={data?.geometry?.rcsb_ramachandran_outliers_percent}
-                suffix="%"
-              />
+              <Link
+                href={`/search?q=${accession}`}
+                className="inline-flex items-center gap-1.5 rounded-md border border-white/25 bg-white/10 px-3 py-2 text-[14px] font-medium text-white hover:bg-white/20"
+              >
+                <ArrowLeft size={14} />
+                Analyse de séquence
+              </Link>
+              <a
+                href={`https://www.uniprot.org/uniprotkb/${accession}/entry`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-md border border-white/25 bg-white/10 px-3 py-2 text-[14px] font-medium text-white hover:bg-white/20"
+              >
+                UniProt
+                <ExternalLink size={13} />
+              </a>
             </div>
           </div>
         </div>
-      )}
+      </section>
+
+      <div className="sticky top-[var(--site-header-h,62px)] z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
+        <div className="flex w-full flex-col gap-2 px-4 py-2 lg:flex-row lg:items-center lg:justify-between lg:px-6">
+          <div role="tablist" className="-mx-1 flex gap-1 overflow-x-auto px-1">
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                role="tab"
+                aria-selected={tab === t.key}
+                onClick={() => setTab(t.key)}
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-[14px] font-semibold transition ${
+                  tab === t.key
+                    ? "bg-[#0f4c81] text-white shadow-sm"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                }`}
+              >
+                {t.icon}
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-md bg-slate-100 p-0.5" role="radiogroup" aria-label="Source du modèle">
+              {(
+                [
+                  ["pdb", "PDB", structures.length > 0],
+                  ["alphafold", "AlphaFold", !!alphafold?.available],
+                ] as const
+              ).map(([key, label, enabled]) => (
+                <button
+                  key={key}
+                  role="radio"
+                  aria-checked={source === key}
+                  disabled={!enabled}
+                  onClick={() => setSource(key)}
+                  className={`rounded px-2.5 py-1 text-[13px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                    source === key ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {structures.length > 0 && (
+              <select
+                aria-label="Structure PDB"
+                value={selectedPdb?.pdb_id ?? ""}
+                onChange={(e) => {
+                  const s = structures.find((x) => x.pdb_id === e.target.value);
+                  if (s) selectStructure(s);
+                }}
+                className="max-w-[320px] rounded-md border border-slate-300 bg-white px-2 py-1 text-[14px] text-slate-800"
+              >
+                {structures.map((s) => (
+                  <option key={s.pdb_id} value={s.pdb_id}>
+                    {s.pdb_id} · {shortMethod(s.method)} · {fmt(s.resolution, 2, " Å")} · {fmt(s.coverage_percent, 0, " %")}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <main className="w-full flex-1 space-y-4 px-4 py-4 lg:px-6">
+        {loading ? (
+          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-4 text-[15px] text-slate-600">
+            <Loader2 size={16} className="animate-spin text-blue-600" />
+            Recherche des structures PDB, du modèle AlphaFold et des segments transmembranaires…
+          </div>
+        ) : loadError ? (
+          <Alert tone="rose" title="Chargement impossible">
+            {loadError}
+          </Alert>
+        ) : (
+          <>
+            <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <StatCard
+                tone="blue"
+                icon={<Database size={16} />}
+                label="Structures PDB"
+                value={`${pdbData?.total_count ?? structures.length}`}
+                hint={
+                  bestResolution != null
+                    ? `Meilleure résolution : ${fmt(bestResolution, 2, " Å")}`
+                    : structures.length
+                    ? "Résolution non renseignée"
+                    : "Aucune structure expérimentale"
+                }
+              />
+              <StatCard
+                tone="violet"
+                icon={<Brain size={16} />}
+                label="AlphaFold"
+                value={alphafold?.available ? `pLDDT ${fmt(alphafold.confidence, 1)}` : "Absent"}
+                hint={alphafold?.available ? alphafold.model_id || "Modèle disponible" : "Aucun modèle"}
+              />
+              <StatCard
+                tone="amber"
+                icon={<Layers size={16} />}
+                label="Segments TM"
+                value={`${tmSegments.length}`}
+                hint={membraneData?.method || "—"}
+              />
+              <StatCard
+                tone="emerald"
+                icon={<ShieldCheck size={16} />}
+                label="Structure active"
+                value={source === "pdb" ? selectedPdb?.pdb_id ?? "—" : "AlphaFold"}
+                hint={
+                  source === "pdb" && selectedPdb
+                    ? `${shortMethod(selectedPdb.method)} · couverture ${fmt(selectedPdb.coverage_percent, 0, " %")}`
+                    : alphafold?.model_id || "—"
+                }
+              />
+            </section>
+
+            {structures.length === 0 && !alphafold?.available && (
+              <Alert tone="amber" title="Aucun modèle 3D">
+                Cette protéine n’a ni structure expérimentale dans le PDB ni modèle AlphaFold.
+              </Alert>
+            )}
+
+            {tab === "overview" && (
+              <div className="space-y-4">
+                <AutoScientificInterpretation
+                  accession={accession}
+                  activeSource={source}
+                  selectedPdb={selectedPdb}
+                  alphafold={alphafold}
+                  membraneData={membraneData ? { ...membraneData, is_membrane: membraneData.is_membrane ?? undefined, predicted_type: membraneData.predicted_type ?? undefined } : null}
+                  qualityData={quality}
+                />
+                <div className="grid gap-4 xl:grid-cols-2">
+                  {selectedPdb ? (
+                    <SelectedStructureCard structure={selectedPdb} length={proteinLength} onView={() => setTab("viewer")} />
+                  ) : (
+                    <EmptyCard text="Aucune structure expérimentale pour cette protéine." />
+                  )}
+                  {alphafold?.available ? (
+                    <AlphaFoldCard
+                      alphafold={alphafold}
+                      accession={accession}
+                      tmSegments={tmSegments}
+                      onSelect={(r) => focus(r, "alphafold")}
+                    />
+                  ) : (
+                    <EmptyCard text="Aucun modèle AlphaFold pour cette protéine." />
+                  )}
+                </div>
+                {structures.length > 0 && proteinLength > 0 && (
+                  <CoverageMap
+                    structures={structures}
+                    length={proteinLength}
+                    tmSegments={tmSegments}
+                    selected={selectedPdb}
+                    onSelect={(s) => selectStructure(s)}
+                  />
+                )}
+              </div>
+            )}
+
+            {tab === "viewer" && (
+              <ViewerTab
+                mapping={mapping}
+                source={source}
+                accession={accession}
+                selectedPdb={selectedPdb}
+                alphafold={alphafold}
+                quality={quality}
+                loadingQuality={loadingQuality}
+                tmRanges={tmRanges}
+                qualityRanges={qualityRanges}
+                activeRange={activeRange}
+                setActiveRange={setActiveRange}
+              />
+            )}
+
+            {tab === "quality" && (
+              <QualityTab
+                selectedPdb={selectedPdb}
+                quality={quality}
+                loading={loadingQuality}
+                activeRange={activeRange}
+                onFocusRange={(r) => focus(r, "pdb")}
+              />
+            )}
+
+            {tab === "membrane" && (
+              <MembraneOrientationPanel
+                accession={accession}
+                pdbId={selectedPdb?.pdb_id}
+                activeRange={activeRange}
+                onFocusRange={(r) => focus(r)}
+              />
+            )}
+
+            {tab === "domains" && (
+              <StructuralDomains
+                accession={accession}
+                alphafold={alphafold}
+                activeRange={activeRange}
+                onFocusRange={(r) => focus(r, alphafold?.available ? "alphafold" : "pdb")}
+                onClearFocus={() => setActiveRange(null)}
+              />
+            )}
+
+            {tab === "active-site" && (
+              <ActiveSitePanel
+                pdbId={selectedPdb?.pdb_id}
+                activeRange={activeRange}
+                onFocusRange={(r) => focus({ ...r, numbering: "pdb" }, "pdb")}
+              />
+            )}
+
+            {tab === "comparison" && (
+              <MultiStructureComparison
+                accession={accession}
+                selectedPdb={selectedPdb}
+                alphafold={alphafold}
+                activeRange={activeRange}
+                autoHighlightRanges={tmRanges}
+              />
+            )}
+
+            {tab === "entries" && (
+              <div className="space-y-4">
+                <PDBTable
+                  structures={structures}
+                  total={pdbData?.total_count}
+                  selected={selectedPdb}
+                  onSelect={(s) => selectStructure(s, true)}
+                />
+                {selectedPdb && <MacromoleculesPanel structure={selectedPdb} />}
+              </div>
+            )}
+          </>
+        )}
+      </main>
+
+      <SiteFooter />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Vue d’ensemble
+// ---------------------------------------------------------------------------
+
+function Card({
+  title,
+  eyebrow,
+  icon,
+  tone,
+  actions,
+  children,
+}: {
+  title: string;
+  eyebrow: string;
+  icon: React.ReactNode;
+  tone: string;
+  actions?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="relative overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <span className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: tone }} />
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 pb-2.5 pt-3.5">
+        <div className="flex items-center gap-2.5">
+          <span className="rounded-md p-2 text-white shadow-sm" style={{ backgroundColor: tone }}>
+            {icon}
+          </span>
+          <div>
+            <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-500">{eyebrow}</p>
+            <h2 className="text-[17px] font-semibold text-slate-900">{title}</h2>
+          </div>
+        </div>
+        {actions}
+      </div>
+      <div className="p-4">{children}</div>
     </section>
   );
 }
 
-function buildERRATGraphWindows({
-  score,
-  allWindows,
-  badWindows,
-  warningWindows,
-}: {
-  score: number | null;
-  allWindows: ERRATWindow[];
-  badWindows: ERRATWindow[];
-  warningWindows: ERRATWindow[];
-}) {
-  if (allWindows.length > 0) {
-    return allWindows;
-  }
-
-  const merged = [...badWindows, ...warningWindows].sort((a, b) => a.start - b.start);
-
-  if (merged.length > 0) {
-    const synthetic: ERRATWindow[] = [];
-    const maxEnd = Math.max(...merged.map((w) => w.end), 120);
-
-    for (let start = 1; start <= maxEnd; start += 6) {
-      const end = start + 5;
-
-      const existing = merged.find((w) => {
-        return !(w.end < start || w.start > end);
-      });
-
-      if (existing) {
-        synthetic.push(existing);
-      } else {
-        synthetic.push({
-          start,
-          end,
-          error_value: typeof score === "number" ? score : 90,
-          status: "good",
-        });
-      }
-    }
-
-    return synthetic;
-  }
-
-  // Fallback visuel : même quand ERRAT = 100 et aucune erreur détectée,
-  // on affiche des fenêtres vertes pour éviter un graphique vide.
-  const baseScore = typeof score === "number" ? score : 95;
-
-  return Array.from({ length: 36 }, (_, index) => {
-    const start = index * 6 + 1;
-    const end = start + 5;
-
-    return {
-      start,
-      end,
-      error_value: Math.max(5, Math.min(100, baseScore - (index % 5) * 1.2)),
-      status: "good" as const,
-    };
-  });
+function EmptyCard({ text }: { text: string }) {
+  return (
+    <div className="flex items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white p-6 text-[14px] text-slate-500">
+      {text}
+    </div>
+  );
 }
 
-function ERRATHeader() {
+function Field({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="mb-3 flex items-center gap-2">
-      <ShieldCheck size={17} className="text-[#0f4c81]" />
+    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+      <dt className="text-[12px] font-medium uppercase tracking-[0.08em] text-slate-500">{label}</dt>
+      <dd className={`truncate text-[15px] font-semibold text-slate-900 ${mono ? "font-mono" : ""}`} title={value}>
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+function SelectedStructureCard({
+  structure,
+  length,
+  onView,
+}: {
+  structure: PDBStructure;
+  length: number;
+  onView: () => void;
+}) {
+  const snap = structure.experimental_snapshot;
+  const v = structure.validation;
+  return (
+    <Card
+      eyebrow="Structure expérimentale"
+      title={`${structure.pdb_id} · ${shortMethod(structure.method)}`}
+      icon={<Database size={16} />}
+      tone="#2563eb"
+      actions={
+        <div className="flex gap-2">
+          <button
+            onClick={onView}
+            className="inline-flex items-center gap-1 rounded-md bg-[#0f4c81] px-2.5 py-1 text-[13px] font-semibold text-white hover:bg-[#0c3d68]"
+          >
+            <Eye size={12} />
+            Voir en 3D
+          </button>
+          <a
+            href={`https://www.rcsb.org/structure/${structure.pdb_id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
+          >
+            RCSB
+            <ExternalLink size={12} />
+          </a>
+        </div>
+      }
+    >
+      <p className="mb-3 text-[14px] leading-5 text-slate-700">{structure.title}</p>
+      <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <Field label="Résolution" value={fmt(structure.resolution, 2, " Å")} />
+        <Field label="R-free" value={fmt(snap?.r_free, 3)} />
+        <Field label="R-work" value={fmt(snap?.r_work, 3)} />
+        <Field label="Chaînes" value={structure.chains?.join(", ") || "—"} mono />
+        <Field label="Publication" value={structure.release_date?.slice(0, 10) || "—"} />
+      </dl>
+
+      {length > 0 && (structure.coverage_ranges?.length ?? 0) > 0 && (
+        <div className="mt-3">
+          <CoverageSummary ranges={structure.coverage_ranges!} length={length} percent={structure.coverage_percent} />
+        </div>
+      )}
+
+      <h3 className="mb-2 mt-4 text-[15px] font-semibold text-slate-900">Validation wwPDB</h3>
+      <ValidationSummary
+        values={{
+          clashscore: v?.clashscore,
+          rama: v?.ramachandran_outliers,
+          rotamer: v?.sidechain_outliers,
+          rsrz: v?.rsrz_outliers,
+        }}
+      />
+    </Card>
+  );
+}
+
+// Repères indicatifs inspirés des objectifs MolProbity / wwPDB (plus bas = meilleur)
+const VALIDATION_METRICS = {
+  clashscore: {
+    label: "Clashscore",
+    suffix: "",
+    thresholds: [5, 10, 20],
+    explain: "Chevauchements atomiques graves pour 1 000 atomes.",
+  },
+  rama: {
+    label: "Ramachandran hors régions",
+    suffix: " %",
+    thresholds: [0.2, 1, 3],
+    explain: "Résidus dont la conformation du squelette (φ/ψ) est improbable.",
+  },
+  rotamer: {
+    label: "Rotamères aberrants",
+    suffix: " %",
+    thresholds: [1, 3, 6],
+    explain: "Chaînes latérales dans une conformation rarement observée.",
+  },
+  rsrz: {
+    label: "RSRZ aberrants",
+    suffix: " %",
+    thresholds: [2, 5, 10],
+    explain: "Résidus mal ajustés à la densité électronique (cristallographie uniquement).",
+  },
+} as const;
+
+type MetricKey = keyof typeof VALIDATION_METRICS;
+
+const VERDICTS = [
+  { label: "Excellent", className: "bg-emerald-50 text-emerald-800 ring-emerald-200", icon: <CheckCircle2 size={14} className="text-emerald-600" /> },
+  { label: "Bon", className: "bg-teal-50 text-teal-800 ring-teal-200", icon: <CheckCircle2 size={14} className="text-teal-600" /> },
+  { label: "Moyen", className: "bg-amber-50 text-amber-800 ring-amber-200", icon: <AlertTriangle size={14} className="text-amber-600" /> },
+  { label: "Médiocre", className: "bg-rose-50 text-rose-800 ring-rose-200", icon: <XCircle size={14} className="text-rose-600" /> },
+];
+
+function verdictIndex(metric: MetricKey, value?: number | null) {
+  if (value == null) return null;
+  const t = VALIDATION_METRICS[metric].thresholds;
+  return value <= t[0] ? 0 : value <= t[1] ? 1 : value <= t[2] ? 2 : 3;
+}
+
+function ValidationVerdict({ metric, value }: { metric: MetricKey; value?: number | null }) {
+  const m = VALIDATION_METRICS[metric];
+  const idx = verdictIndex(metric, value);
+  const verdict = idx == null ? null : VERDICTS[idx];
+  const t = m.thresholds;
+  return (
+    <div className="flex flex-col rounded-md border border-slate-200 bg-white p-3">
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-[14px] font-semibold text-slate-800">{m.label}</span>
+        <span className="font-mono text-[20px] font-bold leading-none text-slate-900">
+          {fmt(value, 2, m.suffix)}
+        </span>
+      </div>
+      <span
+        className={`mt-2 inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[13px] font-semibold ring-1 ${
+          verdict ? verdict.className : "bg-slate-50 text-slate-600 ring-slate-200"
+        }`}
+      >
+        {verdict ? verdict.icon : <Info size={14} className="text-slate-400" />}
+        {verdict ? verdict.label : "Non disponible"}
+      </span>
+      <p className="mt-2 text-[13px] leading-4 text-slate-600">{m.explain}</p>
+      <p className="mt-1 text-[12px] text-slate-400">
+        Repères : ≤ {t[0]}
+        {m.suffix} excellent · ≤ {t[1]}
+        {m.suffix} bon · ≤ {t[2]}
+        {m.suffix} moyen
+      </p>
+    </div>
+  );
+}
+
+function ValidationSummary({ values }: { values: Partial<Record<MetricKey, number | null | undefined>> }) {
+  const keys = Object.keys(VALIDATION_METRICS) as MetricKey[];
+  const available = keys.filter((k) => values[k] != null);
+  const good = available.filter((k) => (verdictIndex(k, values[k]) ?? 3) <= 1).length;
+  return (
+    <div className="space-y-2">
+      {available.length > 0 && (
+        <p className="text-[14px] text-slate-700">
+          <span className="font-semibold text-slate-900">
+            {good} indicateur{good > 1 ? "s" : ""} sur {available.length}
+          </span>{" "}
+          {good > 1 ? "sont" : "est"} excellent{good > 1 ? "s" : ""} ou bon{good > 1 ? "s" : ""}.
+        </p>
+      )}
+      <div className="grid gap-2 sm:grid-cols-2">
+        {keys.map((k) => (
+          <ValidationVerdict key={k} metric={k} value={values[k]} />
+        ))}
+      </div>
+      <p className="text-[12px] text-slate-400">
+        Valeurs calculées par wwPDB ; verdicts établis selon des repères indicatifs (objectifs
+        MolProbity), qui ne tiennent pas compte de la résolution.
+      </p>
+    </div>
+  );
+}
+
+function CoverageSummary({
+  ranges,
+  length,
+  percent,
+}: {
+  ranges: { start: number; end: number }[];
+  length: number;
+  percent?: number | null;
+}) {
+  const covered = ranges.reduce((n, r) => n + (r.end - r.start + 1), 0);
+  const missing: { start: number; end: number }[] = [];
+  let next = 1;
+  for (const r of [...ranges].sort((a, b) => a.start - b.start)) {
+    if (r.start > next) missing.push({ start: next, end: r.start - 1 });
+    next = Math.max(next, r.end + 1);
+  }
+  if (next <= length) missing.push({ start: next, end: length });
+
+  const chip = (r: { start: number; end: number }, tone: string) => (
+    <span key={`${r.start}-${r.end}`} className={`rounded px-1.5 py-0.5 font-mono text-[13px] ${tone}`}>
+      {r.start}–{r.end}
+      <span className="ml-1 opacity-60">({r.end - r.start + 1})</span>
+    </span>
+  );
+
+  return (
+    <div className="grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[150px_1fr]">
       <div>
-        <h2 className="text-[14px] font-bold text-slate-900">
-          ERRAT automatique · qualité globale
-        </h2>
-        <p className="text-[11px] text-slate-500">
-          Score local d’ERRAT.
+        <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-slate-500">Couverture</p>
+        <p className="text-[28px] font-bold leading-tight text-slate-900">{fmt(percent, 1, " %")}</p>
+        <p className="text-[13px] text-slate-600">
+          {covered} / {length} résidus UniProt
+        </p>
+      </div>
+      <div className="space-y-2 text-[13px]">
+        <div>
+          <p className="mb-1 font-semibold text-slate-700">Régions présentes dans la structure</p>
+          <div className="flex flex-wrap gap-1">{ranges.map((r) => chip(r, "bg-blue-100 text-blue-800"))}</div>
+        </div>
+        {missing.length > 0 && (
+          <div>
+            <p className="mb-1 font-semibold text-slate-700">Régions absentes</p>
+            <div className="flex flex-wrap gap-1">{missing.map((r) => chip(r, "bg-white text-slate-600 ring-1 ring-slate-200"))}</div>
+          </div>
+        )}
+        <p className="leading-4 text-slate-500">
+          Les régions absentes sont souvent flexibles (extrémités, longues boucles) et non
+          visibles dans les données, ou ont été retirées ou remplacées pour obtenir la structure.
         </p>
       </div>
     </div>
   );
 }
 
-function ERRATGaugeProfessional({ score }: { score: number | null }) {
-  const safeScore =
-    typeof score === "number" ? Math.max(0, Math.min(100, score)) : 0;
+const PLDDT_MEANING: Record<string, string> = {
+  very_high: "Squelette et chaînes latérales très fiables.",
+  confident: "Squelette généralement bien prédit.",
+  low: "À interpréter avec prudence.",
+  very_low: "Région souvent désordonnée : pas de conformation fiable.",
+};
 
-  const label =
-    score === null
-      ? "Non calculé"
-      : safeScore >= 80
-      ? "Bon"
-      : safeScore >= 50
-      ? "Moyen"
-      : "Faible";
-
-  const color =
-    score === null
-      ? "bg-slate-300"
-      : safeScore >= 80
-      ? "bg-emerald-500"
-      : safeScore >= 50
-      ? "bg-amber-500"
-      : "bg-red-500";
+function PlddtDonut({
+  fractions,
+  mean,
+}: {
+  fractions: Partial<Record<string, number | null>>;
+  mean?: number | null;
+}) {
+  const size = 150;
+  const r = 58;
+  const stroke = 20;
+  const c = 2 * Math.PI * r;
+  const gap = 2;
+  let offset = 0;
+  const arcs = PLDDT_BANDS.map((b) => {
+    const f = fractions[b.key] ?? 0;
+    const len = Math.max(f * c - gap, 0);
+    const arc = { ...b, f, dash: `${len} ${c - len}`, offset: -offset };
+    offset += f * c;
+    return arc;
+  });
 
   return (
-    <div className="rounded border border-slate-200 bg-white p-4">
-      <div className="flex items-end justify-between">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
-            ERRAT quality factor
-          </p>
-          <p className="mt-1 text-[34px] font-black text-slate-900">
-            {score === null ? "-" : safeScore}
-          </p>
-        </div>
+    <div className="grid items-center gap-4 sm:grid-cols-[150px_1fr]">
+      <svg viewBox={`0 0 ${size} ${size}`} className="mx-auto w-[150px]" role="img" aria-label="Répartition du pLDDT">
+        <g transform={`rotate(-90 ${size / 2} ${size / 2})`}>
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#f1f5f9" strokeWidth={stroke} />
+          {arcs.map((a) =>
+            a.f > 0 ? (
+              <circle
+                key={a.key}
+                cx={size / 2}
+                cy={size / 2}
+                r={r}
+                fill="none"
+                stroke={a.color}
+                strokeWidth={stroke}
+                strokeDasharray={a.dash}
+                strokeDashoffset={a.offset}
+              >
+                <title>{`${a.label} : ${fmt(a.f * 100, 1, " %")}`}</title>
+              </circle>
+            ) : null
+          )}
+        </g>
+        <text x={size / 2} y={size / 2 + 2} textAnchor="middle" fontSize={27} fontWeight={700} fill="#0f172a">
+          {fmt(mean, 1)}
+        </text>
+        <text x={size / 2} y={size / 2 + 20} textAnchor="middle" fontSize={11} fill="#64748b">
+          pLDDT moyen
+        </text>
+      </svg>
+      <ul className="space-y-1.5">
+        {PLDDT_BANDS.map((b) => (
+          <li key={b.key} className="flex items-start gap-2 text-[13px]">
+            <span className="mt-0.5 h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: b.color }} />
+            <span className="flex-1">
+              <span className="font-semibold text-slate-800">{b.label}</span>
+              <span className="block text-slate-500">{PLDDT_MEANING[b.key]}</span>
+            </span>
+            <span className="font-mono text-[14px] font-semibold text-slate-900">
+              {fmt((fractions[b.key] ?? 0) * 100, 1, " %")}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
-        <span
-          className={`rounded px-3 py-1 text-[11px] font-bold ${
-            score === null
-              ? "bg-slate-100 text-slate-600"
-              : safeScore >= 80
-              ? "bg-emerald-100 text-emerald-800"
-              : safeScore >= 50
-              ? "bg-amber-100 text-amber-800"
-              : "bg-red-100 text-red-800"
-          }`}
-        >
-          {label}
-        </span>
+function AlphaFoldCard({
+  alphafold,
+  accession,
+  tmSegments,
+  onSelect,
+}: {
+  alphafold: AlphaFoldData;
+  accession: string;
+  tmSegments: MembraneSegment[];
+  onSelect: (range: HighlightRange) => void;
+}) {
+  return (
+    <Card
+      eyebrow="Modèle prédit"
+      title={alphafold.model_id || "AlphaFold"}
+      icon={<Brain size={16} />}
+      tone="#7c3aed"
+      actions={
+        <div className="flex flex-wrap gap-2">
+          {alphafold.pdb_url && (
+            <a href={alphafold.pdb_url} className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50">
+              <Download size={12} />
+              PDB
+            </a>
+          )}
+          {alphafold.cif_url && (
+            <a href={alphafold.cif_url} className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50">
+              <Download size={12} />
+              mmCIF
+            </a>
+          )}
+          <a
+            href={`https://alphafold.ebi.ac.uk/entry/${accession}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
+          >
+            AlphaFold DB
+            <ExternalLink size={12} />
+          </a>
+        </div>
+      }
+    >
+      <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
+        <div>
+          <dl className="grid grid-cols-3 gap-2">
+            <Field label="Longueur" value={alphafold.sequence_length ? `${alphafold.sequence_length} aa` : "—"} />
+            <Field label="Version" value={alphafold.latest_version ? `v${alphafold.latest_version}` : "—"} />
+            <Field label="Date du modèle" value={alphafold.model_created?.slice(0, 10) || "—"} />
+          </dl>
+
+          <p className="mb-2 mt-4 text-[15px] font-semibold text-slate-900">Confiance du modèle (pLDDT)</p>
+          <PlddtDonut fractions={alphafold.plddt_fractions ?? {}} mean={alphafold.confidence} />
+        </div>
+        {alphafold.pae_image_url && (
+          <figure className="w-full sm:w-[170px]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={alphafold.pae_image_url}
+              alt="Erreur d’alignement prédite (PAE)"
+              className="aspect-square w-full rounded-md border border-slate-200 object-contain"
+            />
+            <figcaption className="mt-1 text-center text-[12px] text-slate-500">
+              Erreur d’alignement prédite (PAE)
+            </figcaption>
+          </figure>
+        )}
       </div>
 
-      <div className="mt-4 h-4 overflow-hidden rounded-full bg-slate-200">
-        <div
-          className={`h-full rounded-full ${color}`}
-          style={{ width: `${score === null ? 0 : safeScore}%` }}
+      <div className="mt-5 border-t border-slate-100 pt-4">
+        <p className="text-[15px] font-semibold text-slate-900">Confiance le long de la séquence</p>
+        <p className="mb-2 text-[13px] text-slate-500">
+          pLDDT de chaque résidu (0–100) ; les segments transmembranaires sont indiqués sous
+          l’axe.
+        </p>
+        <PlddtProfile
+          plddtUrl={alphafold.plddt_url}
+          sequence={alphafold.sequence}
+          tmSegments={tmSegments}
+          onSelect={onSelect}
         />
       </div>
-
-      <div className="mt-1 flex justify-between text-[10px] font-semibold text-slate-500">
-        <span>0</span>
-        <span>50</span>
-        <span>80</span>
-        <span>100</span>
-      </div>
-    </div>
+    </Card>
   );
 }
 
-function ERRATWindowChart({
-  windows,
-  onFocusRange,
+function CoverageMap({
+  structures,
+  length,
+  tmSegments,
+  selected,
+  onSelect,
 }: {
-  windows: ERRATWindow[];
-  onFocusRange: (range: HighlightRange) => void;
+  structures: PDBStructure[];
+  length: number;
+  tmSegments: MembraneSegment[];
+  selected: PDBStructure | null;
+  onSelect: (s: PDBStructure) => void;
 }) {
-  if (!windows.length) {
-    return (
-      <div className="flex h-[240px] items-center justify-center rounded border border-slate-200 bg-slate-50 text-[12px] text-slate-500">
-        Aucune donnée ERRAT disponible.
+  const [showAll, setShowAll] = useState(false);
+  const rows = showAll ? structures : structures.slice(0, 12);
+  return (
+    <Card
+      eyebrow="PDB"
+      title="Couverture de la séquence par les structures"
+      icon={<Layers size={16} />}
+      tone="#0891b2"
+      actions={
+        structures.length > 12 && (
+          <button
+            onClick={() => setShowAll((v) => !v)}
+            className="rounded-md border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
+          >
+            {showAll ? "Afficher les 12 premières" : `Afficher les ${structures.length}`}
+          </button>
+        )
+      }
+    >
+      <div className="overflow-x-auto">
+        <div className="min-w-[560px] space-y-1">
+          <div className="flex items-center gap-3">
+            <span className="w-[150px] shrink-0 text-right text-[13px] font-semibold text-amber-700">Segments TM</span>
+            <div className="relative h-3 flex-1 rounded bg-slate-100">
+              {tmSegments.map((s, i) => (
+                <span
+                  key={i}
+                  className="absolute top-0 h-full bg-amber-500"
+                  style={{ left: `${((s.start - 1) / length) * 100}%`, width: `${((s.end - s.start + 1) / length) * 100}%` }}
+                  title={`${s.label || `TM${i + 1}`} : ${s.start}–${s.end}`}
+                />
+              ))}
+            </div>
+          </div>
+          {rows.map((s) => (
+            <button
+              key={s.pdb_id}
+              onClick={() => onSelect(s)}
+              className={`flex w-full items-center gap-3 rounded px-0 py-0.5 text-left transition hover:bg-slate-50 ${
+                selected?.pdb_id === s.pdb_id ? "bg-blue-50" : ""
+              }`}
+              title={`${s.pdb_id} · ${s.title}`}
+            >
+              <span className="w-[150px] shrink-0 truncate text-right text-[13px]">
+                <span className="font-mono font-semibold text-slate-900">{s.pdb_id}</span>
+                <span className="text-slate-500"> · {fmt(s.resolution, 2, " Å")}</span>
+              </span>
+              <span className="relative h-3 flex-1 rounded bg-slate-100">
+                {(s.coverage_ranges ?? []).map((r) => (
+                  <span
+                    key={`${r.start}-${r.end}`}
+                    className={`absolute top-0 h-full rounded-sm ${selected?.pdb_id === s.pdb_id ? "bg-blue-700" : "bg-blue-400"}`}
+                    style={{ left: `${((r.start - 1) / length) * 100}%`, width: `${((r.end - r.start + 1) / length) * 100}%` }}
+                  />
+                ))}
+              </span>
+            </button>
+          ))}
+          <div className="flex justify-between pl-[162px] font-mono text-[12px] text-slate-400">
+            <span>1</span>
+            <span>{length}</span>
+          </div>
+        </div>
       </div>
-    );
-  }
+      <p className="mt-2 text-[13px] text-slate-500">
+        Barres bleues : résidus de la séquence UniProt modélisés dans chaque entrée (alignement
+        RCSB). Cliquez une ligne pour sélectionner la structure.
+      </p>
+    </Card>
+  );
+}
 
-  const maxValue = Math.max(...windows.map((w) => w.error_value), 1);
+// ---------------------------------------------------------------------------
+// Visualisation 3D
+// ---------------------------------------------------------------------------
+
+function ViewerTab({
+  mapping,
+  source,
+  accession,
+  selectedPdb,
+  alphafold,
+  quality,
+  loadingQuality,
+  tmRanges,
+  qualityRanges,
+  activeRange,
+  setActiveRange,
+}: {
+  source: Source;
+  accession: string;
+  selectedPdb: PDBStructure | null;
+  alphafold: AlphaFoldData | null;
+  quality: QualityData | null;
+  loadingQuality: boolean;
+  mapping: ResidueMapping | null;
+  tmRanges: HighlightRange[];
+  qualityRanges: HighlightRange[];
+  activeRange: HighlightRange | null;
+  setActiveRange: (r: HighlightRange | null) => void;
+}) {
+  const [showTM, setShowTM] = useState(true);
+  const [showOutliers, setShowOutliers] = useState(true);
+
+  // Structure PDB : conversion UniProt → numérotation de la structure (SIFTS).
+  // Modèle AlphaFold : même numérotation qu'UniProt, aucune conversion.
+  const pdbTM = mapRanges(tmRanges, mapping);
+  const autoRanges = [...(showTM ? pdbTM : []), ...(source === "pdb" && showOutliers ? qualityRanges : [])];
+  const pdbFocus = activeRange ? mapRanges([activeRange], mapping) : [];
+  const focusMissing = source === "pdb" && !!activeRange && pdbFocus.length === 0;
+  const isPdb = source === "pdb" && !!selectedPdb;
+  const isAf = source === "alphafold" && !!alphafold?.available && !!alphafold.pdb_url;
 
   return (
-    <div className="h-[240px] rounded border border-slate-200 bg-white p-3">
-      <div className="flex h-full items-end gap-1 overflow-x-auto">
-        {windows.map((window, index) => {
-          const height = Math.max(10, (window.error_value / maxValue) * 100);
-
-          const color =
-            window.status === "bad"
-              ? "bg-red-500 hover:bg-red-600"
-              : window.status === "warning"
-              ? "bg-amber-400 hover:bg-amber-500"
-              : "bg-emerald-500 hover:bg-emerald-600";
-
-          return (
-            <button
-              key={`${window.start}-${window.end}-${window.status}-${index}`}
-              onClick={() =>
-                onFocusRange({
-                  start: window.start,
-                  end: window.end,
-                  label:
-                    window.status === "bad"
-                      ? "ERRAT bad window"
-                      : window.status === "warning"
-                      ? "ERRAT warning window"
-                      : "ERRAT good window",
-                  color:
-                    window.status === "bad"
-                      ? "#dc2626"
-                      : window.status === "warning"
-                      ? "#f59e0b"
-                      : "#22c55e",
-                })
-              }
-              className={`min-w-[8px] flex-1 rounded-t ${color} transition`}
-              style={{ height: `${height}%` }}
-              title={`${window.start}-${window.end}: ${Math.round(window.error_value)}`}
+    <div className="grid gap-4 xl:grid-cols-[1fr_380px]">
+      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
+          <div>
+            <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+              {isPdb ? "Structure expérimentale" : "Modèle AlphaFold"}
+            </p>
+            <h2 className="text-[17px] font-semibold text-slate-900">
+              {isPdb ? `${selectedPdb!.pdb_id} · ${shortMethod(selectedPdb!.method)}` : alphafold?.model_id || "—"}
+            </h2>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-[13px] text-slate-700">
+            <label className="flex items-center gap-1.5">
+              <input type="checkbox" checked={showTM} onChange={(e) => setShowTM(e.target.checked)} className="accent-amber-600" />
+              Segments TM
+            </label>
+            {source === "pdb" && (
+              <label className="flex items-center gap-1.5">
+                <input type="checkbox" checked={showOutliers} onChange={(e) => setShowOutliers(e.target.checked)} className="accent-rose-600" />
+                Résidus hors régions Ramachandran
+              </label>
+            )}
+            {activeRange && (
+              <button
+                onClick={() => setActiveRange(null)}
+                className="rounded-md border border-slate-200 px-2 py-0.5 font-medium hover:bg-slate-50"
+              >
+                Effacer la sélection ({activeRange.label || `${activeRange.start}–${activeRange.end}`})
+              </button>
+            )}
+          </div>
+        </div>
+        {focusMissing && (
+          <p className="border-b border-amber-100 bg-amber-50 px-4 py-2 text-[13px] text-amber-900">
+            La région sélectionnée ({activeRange!.label || `${activeRange!.start}–${activeRange!.end}`}) n’est pas
+            modélisée dans {selectedPdb?.pdb_id}. Choisissez une autre structure ou le modèle AlphaFold.
+          </p>
+        )}
+        <div className="h-[540px]">
+          {isPdb ? (
+            <Structure3DViewer
+              pdbId={selectedPdb!.pdb_id}
+              mode="pdb"
+              highlightRanges={pdbFocus}
+              autoHighlightRanges={autoRanges}
             />
-          );
-        })}
-      </div>
+          ) : isAf ? (
+            <Structure3DViewer
+              pdbUrl={alphafold!.pdb_url}
+              mode="alphafold"
+              highlightRanges={activeRange ? [activeRange] : []}
+              autoHighlightRanges={showTM ? tmRanges : []}
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center text-[15px] text-slate-400">
+              Aucun modèle disponible pour cette source.
+            </div>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-3 border-t border-slate-100 px-4 py-2 text-[13px] text-slate-600">
+          {source === "alphafold" ? (
+            PLDDT_BANDS.map((b) => (
+              <span key={b.key} className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: b.color }} />
+                pLDDT {b.label.toLowerCase()}
+              </span>
+            ))
+          ) : (
+            <>
+              <LegendDot color="#d97706" label="Segment transmembranaire" />
+              <LegendDot color={RAMA_COLORS.outlier} label="Résidu hors régions Ramachandran" />
+            </>
+          )}
+          <LegendDot color="#7c3aed" label="Sélection" />
+          <span className="ml-auto text-slate-400">
+            {source === "alphafold"
+              ? "Numérotation UniProt (identique à celle du modèle)."
+              : mapping?.available
+              ? `Annotations converties dans la numérotation de ${mapping.pdb_id} (SIFTS)${mapping.identity ? ", identique à UniProt" : ""}.`
+              : "Correspondance SIFTS indisponible : numérotation UniProt utilisée."}
+          </span>
+        </div>
+        {tmRanges.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 border-t border-slate-100 px-4 py-2">
+            {tmRanges.map((r) => (
+              <button
+                key={`${r.start}-${r.end}`}
+                onClick={() => setActiveRange({ ...r, color: "#7c3aed" })}
+                className={`rounded border px-2 py-0.5 text-[13px] font-medium ${
+                  activeRange?.start === r.start && activeRange?.end === r.end
+                    ? "border-violet-300 bg-violet-50 text-violet-800"
+                    : "border-amber-200 text-amber-800 hover:bg-amber-50"
+                }`}
+              >
+                {r.label} · {r.start}–{r.end}
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <aside className="space-y-4">
+        {source === "pdb" ? (
+          <section className="rounded-lg border border-slate-200 bg-white p-3">
+            <h3 className="text-[15px] font-semibold text-slate-900">Diagramme de Ramachandran</h3>
+            <p className="mb-2 text-[13px] text-slate-500">Angles φ/ψ calculés depuis {selectedPdb?.pdb_id ?? "la structure"}</p>
+            {loadingQuality ? (
+              <PanelSpinner text="Calcul des angles φ/ψ…" />
+            ) : (
+              <RamachandranPlot
+                points={quality?.ramachandran?.points ?? []}
+                onSelect={(p) =>
+                  setActiveRange({
+                    start: p.resi,
+                    end: p.resi,
+                    label: `${p.resn}${p.resi} (${p.chain})`,
+                    chain: p.chain,
+                    numbering: "pdb",
+                    color: "#7c3aed",
+                  })
+                }
+              />
+            )}
+          </section>
+        ) : (
+          <section className="rounded-lg border border-slate-200 bg-white p-3 text-[14px] text-slate-600">
+            <h3 className="text-[15px] font-semibold text-slate-900">Lecture du modèle AlphaFold</h3>
+            <p className="mt-1 leading-5">
+              Les couleurs indiquent le pLDDT, la confiance locale du modèle. Les régions orange
+              (pLDDT &lt; 50) sont souvent désordonnées et ne doivent pas être interprétées comme
+              une conformation réelle.
+            </p>
+            <a
+              href={`https://alphafold.ebi.ac.uk/entry/${accession}`}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-flex items-center gap-1 text-[14px] font-medium text-violet-700 hover:underline"
+            >
+              Voir la fiche AlphaFold DB
+              <ExternalLink size={12} />
+            </a>
+          </section>
+        )}
+      </aside>
     </div>
   );
 }
 
-function ERRATLegend({ color, label }: { color: string; label: string }) {
+function LegendDot({ color, label }: { color: string; label: string }) {
   return (
-    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-600">
-      <span className={`h-2 w-2 rounded-full ${color}`} />
+    <span className="flex items-center gap-1.5">
+      <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: color }} />
       {label}
     </span>
   );
 }
 
-function GeometryMini({
-  label,
-  value,
-  suffix,
-}: {
-  label: string;
-  value?: number | null;
-  suffix: string;
-}) {
+function PanelSpinner({ text }: { text: string }) {
   return (
-    <div className="rounded border border-slate-200 bg-white p-3">
-      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
-        {label}
-      </p>
-      <p className="mt-1 text-[18px] font-bold text-slate-900">
-        {typeof value === "number" ? `${value}${suffix}` : "-"}
-      </p>
+    <div className="flex h-[200px] items-center justify-center gap-2 text-[14px] text-slate-500">
+      <Loader2 size={15} className="animate-spin text-blue-600" />
+      {text}
     </div>
   );
 }
 
+// Régions de référence : identiques à la classification du serveur
+const RAMA_REGIONS = [
+  { label: "β", phi: [-180, -45], psi: [90, 180] },
+  { label: "", phi: [-180, -45], psi: [-180, -170] },
+  { label: "αR", phi: [-160, -20], psi: [-100, 50] },
+  { label: "αL", phi: [30, 100], psi: [-20, 100], allowed: true },
+];
 
-function MiniStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded border border-slate-200 bg-slate-50 p-2 text-center">
-      <p className="text-[10px] font-semibold text-slate-500">{label}</p>
-      <p className="text-[13px] font-bold text-slate-900">{value}</p>
-    </div>
-  );
-}
+function RamachandranPlot({ points, onSelect }: { points: RamaPoint[]; onSelect: (p: RamaPoint) => void }) {
+  const [hover, setHover] = useState<RamaPoint | null>(null);
+  const size = 300;
+  const pad = 28;
+  const plot = size - pad - 8;
+  const x = (phi: number) => pad + ((phi + 180) / 360) * plot;
+  const y = (psi: number) => 8 + ((180 - psi) / 360) * plot;
 
-function AlphaFoldDetailsPanel({
-  alphafold,
-  accession,
-}: {
-  alphafold: AlphaFoldData;
-  accession: string;
-}) {
-  const sequence = alphafold.sequence || "";
-  const sequenceBlocks = [];
-
-  for (let i = 0; i < sequence.length; i += 70) {
-    sequenceBlocks.push({
-      index: i + 1,
-      text: sequence.slice(i, i + 70),
-    });
+  if (!points.length) {
+    return <p className="py-8 text-center text-[14px] text-slate-500">Aucun angle calculable.</p>;
   }
 
-  const confidence = alphafold.confidence ?? alphafold.confidence_avg ?? null;
+  // Les résidus hors régions sont dessinés en dernier pour rester visibles
+  const order = { favored: 0, allowed: 1, outlier: 2 } as const;
+  const sorted = [...points].sort((a, b) => order[a.status] - order[b.status]);
 
   return (
-    <section className="rounded border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-slate-200 bg-[#f8fafc] px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Brain size={17} className="text-violet-700" />
-          <div>
-            <h2 className="text-[14px] font-bold text-slate-900">
-              AlphaFold model evidence
-            </h2>
-            <p className="text-[11px] text-slate-500">
-              Evidence: pLDDT, sequence and compact PAE.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex gap-2">
-          {alphafold.pdb_url && (
-            <a
-              href={alphafold.pdb_url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 rounded border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700"
-            >
-              PDB
-              <Download size={12} />
-            </a>
-          )}
-
-          {alphafold.cif_url && (
-            <a
-              href={alphafold.cif_url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 rounded border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700"
-            >
-              CIF
-              <Download size={12} />
-            </a>
-          )}
-
-          <a
-            href={`https://alphafold.ebi.ac.uk/entry/${accession}`}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 rounded border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-semibold text-violet-700"
-          >
-            Open AlphaFold
-            <ExternalLink size={12} />
-          </a>
-        </div>
+    <div className="relative">
+      <svg viewBox={`0 0 ${size} ${size}`} className="w-full" role="img" aria-label="Diagramme de Ramachandran">
+        <rect x={pad} y={8} width={plot} height={plot} fill="#f8fafc" stroke="#e2e8f0" />
+        {RAMA_REGIONS.map((r, i) => (
+          <g key={i}>
+            <rect
+              x={x(r.phi[0])}
+              y={y(r.psi[1])}
+              width={x(r.phi[1]) - x(r.phi[0])}
+              height={y(r.psi[0]) - y(r.psi[1])}
+              fill={r.allowed ? "#fef3c7" : "#dcfce7"}
+            />
+            {r.label && (
+              <text x={x(r.phi[0]) + 4} y={y(r.psi[1]) + 12} fontSize="11" fill="#475569" fontWeight="600">
+                {r.label}
+              </text>
+            )}
+          </g>
+        ))}
+        <line x1={x(0)} x2={x(0)} y1={8} y2={8 + plot} stroke="#cbd5e1" />
+        <line x1={pad} x2={pad + plot} y1={y(0)} y2={y(0)} stroke="#cbd5e1" />
+        {[-180, 0, 180].map((v) => (
+          <g key={v}>
+            <text x={x(v)} y={size - 6} fontSize="10" fill="#64748b" textAnchor="middle">
+              {v}
+            </text>
+            <text x={pad - 4} y={y(v) + 3} fontSize="10" fill="#64748b" textAnchor="end">
+              {v}
+            </text>
+          </g>
+        ))}
+        <text x={pad + plot / 2} y={size - 6} fontSize="11" fill="#334155" textAnchor="middle" dx={40}>
+          φ (°)
+        </text>
+        <text x={10} y={8 + plot / 2} fontSize="11" fill="#334155" textAnchor="middle" transform={`rotate(-90 10 ${8 + plot / 2})`}>
+          ψ (°)
+        </text>
+        {sorted.map((p, i) => (
+          <circle
+            key={`${p.chain}-${p.resi}-${i}`}
+            cx={x(p.phi)}
+            cy={y(p.psi)}
+            r={p.status === "favored" ? 2 : 3}
+            fill={RAMA_COLORS[p.status]}
+            stroke="#ffffff"
+            strokeWidth={p.status === "favored" ? 0.4 : 0.8}
+            className="cursor-pointer"
+            onMouseEnter={() => setHover(p)}
+            onMouseLeave={() => setHover(null)}
+            onClick={() => onSelect(p)}
+          />
+        ))}
+      </svg>
+      <div className="mt-1 h-4 text-[13px] text-slate-600" aria-live="polite">
+        {hover ? (
+          <>
+            <span className="font-mono font-semibold text-slate-900">
+              {hover.resn}
+              {hover.resi}
+            </span>{" "}
+            chaîne {hover.chain} · φ {hover.phi}° · ψ {hover.psi}° · {RAMA_LABELS[hover.status]}
+          </>
+        ) : (
+          "Survolez un point ; cliquez pour le localiser en 3D."
+        )}
       </div>
+      <div className="mt-1 flex flex-wrap gap-3 text-[13px] text-slate-600">
+        {(Object.keys(RAMA_COLORS) as (keyof typeof RAMA_COLORS)[]).map((k) => (
+          <span key={k} className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: RAMA_COLORS[k] }} />
+            {RAMA_LABELS[k]} ({points.filter((p) => p.status === k).length})
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
 
-      <div className="grid grid-cols-12 gap-3 p-4">
-        <div className="col-span-8">
-          <div className="rounded border border-slate-200 bg-slate-50 p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-[12px] font-bold text-slate-800">Sequence</p>
-              <span className="text-[11px] text-slate-500">
-                {sequence.length || alphafold.sequence_length || "-"} aa
-              </span>
-            </div>
+// ---------------------------------------------------------------------------
+// Qualité
+// ---------------------------------------------------------------------------
 
-            <div className="max-h-[170px] overflow-auto rounded bg-white p-3 font-mono text-[11px] leading-5">
-              {sequenceBlocks.length > 0 ? (
-                sequenceBlocks.map((block) => (
-                  <div key={block.index} className="flex gap-3 whitespace-nowrap">
-                    <span className="w-[45px] shrink-0 text-right text-slate-400">
-                      {block.index}
-                    </span>
-                    <span className="tracking-wide text-slate-800">
-                      {block.text}
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <p className="text-slate-400">Séquence non disponible.</p>
+function QualityTab({
+  selectedPdb,
+  quality,
+  loading,
+  activeRange,
+  onFocusRange,
+}: {
+  selectedPdb: PDBStructure | null;
+  quality: QualityData | null;
+  loading: boolean;
+  activeRange: HighlightRange | null;
+  onFocusRange: (r: HighlightRange) => void;
+}) {
+  if (!selectedPdb) {
+    return <EmptyCard text="La qualité structurale s’évalue sur une structure PDB : aucune n’est disponible." />;
+  }
+  if (loading) {
+    return (
+      <div className="rounded-lg border border-slate-200 bg-white">
+        <PanelSpinner text={`Analyse de ${selectedPdb.pdb_id}…`} />
+      </div>
+    );
+  }
+
+  const geometry = quality?.geometry;
+  const rama = quality?.ramachandran;
+  const contacts = quality?.errat;
+
+  return (
+    <div className="space-y-4">
+      {quality?.error && (
+        <Alert tone="amber" title="Analyse partielle">
+          {quality.error}
+        </Alert>
+      )}
+
+      <div className="grid items-start gap-4 xl:grid-cols-2">
+        <div className="space-y-4">
+          <Card
+            eyebrow="Référence officielle"
+            title="Validation wwPDB"
+            icon={<ShieldCheck size={16} />}
+            tone="#059669"
+            actions={
+              <a
+                href={`https://www.rcsb.org/structure/${selectedPdb.pdb_id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Rapport complet
+                <ExternalLink size={12} />
+              </a>
+            }
+          >
+            {geometry?.available === false ? (
+              <p className="text-[14px] text-slate-500">Aucun rapport de validation wwPDB pour cette entrée.</p>
+            ) : (
+              <ValidationSummary
+                values={{
+                  clashscore: geometry?.clashscore,
+                  rama: geometry?.rcsb_ramachandran_outliers_percent,
+                  rotamer: geometry?.sidechain_outliers_percent,
+                  rsrz: geometry?.rsrz_outliers_percent,
+                }}
+              />
+            )}
+          </Card>
+
+          <Card eyebrow="Calcul local" title="Contacts atomiques anormaux" icon={<ShieldCheck size={16} />} tone="#e11d48">
+            <ContactWindowsChart windows={contacts?.all_windows ?? []} activeRange={activeRange} onFocusRange={onFocusRange} />
+            <dl className="mt-3 grid grid-cols-3 gap-2">
+              <Field label="Sans contact anormal" value={fmt(contacts?.score, 1, " %")} />
+              <Field label="Problématiques" value={`${contacts?.bad_windows?.length ?? 0}`} />
+              <Field label="À surveiller" value={`${contacts?.warning_windows?.length ?? 0}`} />
+            </dl>
+            <p className="mt-2 text-[13px] leading-4 text-slate-500">
+              {contacts?.interpretation} Indicateur local inspiré d’ERRAT (ce n’est pas le
+              programme ERRAT) ; la référence reste le clashscore wwPDB.
+            </p>
+          </Card>
+        </div>
+
+        <Card eyebrow="Calcul local" title="Ramachandran" icon={<Boxes size={16} />} tone="#2563eb">
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,340px)_1fr]">
+            <RamachandranPlot
+              points={rama?.points ?? []}
+              onSelect={(p) =>
+                onFocusRange({ start: p.resi, end: p.resi, label: `${p.resn}${p.resi} (${p.chain})`,
+                    chain: p.chain,
+                    numbering: "pdb", color: "#7c3aed" })
+              }
+            />
+            <div className="space-y-2">
+              <dl className="grid gap-2">
+                <Field label="Favorables" value={fmt(rama?.favored_percent, 1, " %")} />
+                <Field label="Autorisés" value={fmt(rama?.allowed_percent, 1, " %")} />
+                <Field label="Hors régions" value={fmt(rama?.outliers_percent, 1, " %")} />
+                <Field
+                  label="Hors régions (wwPDB)"
+                  value={fmt(geometry?.rcsb_ramachandran_outliers_percent, 2, " %")}
+                />
+              </dl>
+              {rama?.interpretation && (
+                <p className="text-[13px] leading-4 text-slate-500">{rama.interpretation}</p>
               )}
             </div>
           </div>
-        </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
 
-        <div className="col-span-4 rounded border border-blue-100 bg-blue-50 p-3">
-          <p className="mb-2 text-[12px] font-bold text-blue-900">
-            Model confidence
+function ContactWindowsChart({
+  windows,
+  activeRange,
+  onFocusRange,
+}: {
+  windows: ContactWindow[];
+  activeRange: HighlightRange | null;
+  onFocusRange: (r: HighlightRange) => void;
+}) {
+  const [hover, setHover] = useState<ContactWindow | null>(null);
+  if (!windows.length) {
+    return <p className="py-8 text-center text-[14px] text-slate-500">Aucune fenêtre calculée.</p>;
+  }
+
+  const flagged = windows.filter((w) => w.error_value > 0).length;
+  if (flagged === 0) {
+    // Graphique de barres nulles illisible : on l’indique explicitement
+    return (
+      <div className="flex items-start gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-4">
+        <span className="rounded-md bg-emerald-600 p-1.5 text-white">
+          <ShieldCheck size={16} />
+        </span>
+        <div>
+          <p className="text-[15px] font-semibold text-emerald-900">Aucun contact atomique anormal détecté</p>
+          <p className="text-[14px] leading-5 text-emerald-900/80">
+            Les {windows.length.toLocaleString("fr-FR")} fenêtres de 9 résidus analysées ne
+            contiennent aucune paire d’atomes dont les sphères de van der Waals se chevauchent
+            de plus de 0,5 Å.
           </p>
-          <ConfidenceLegend />
-          <div className="mt-3 rounded bg-white p-3">
-            <p className="text-[11px] text-slate-500">Average pLDDT</p>
-            <p className="text-[24px] font-bold text-blue-800">
-              {confidence !== null ? Math.round(confidence) : "-"}
-            </p>
-          </div>
         </div>
       </div>
-    </section>
-  );
-}
+    );
+  }
 
-function ExperimentalSnapshotPanel({
-  snapshot,
-}: {
-  snapshot?: ExperimentalSnapshot;
-}) {
+  const width = 720;
+  const height = 160;
+  // Échelle au moins jusqu’au seuil « problématique » pour situer les barres
+  const max = Math.max(0.6, ...windows.map((w) => w.error_value));
+  const barW = width / windows.length;
+  const color = { good: "#16a34a", warning: "#d97706", bad: "#dc2626" } as const;
+  const yOf = (v: number) => height - (v / max) * (height - 6);
+
   return (
-    <section className="rounded border border-slate-200 bg-white p-3 shadow-sm">
-      <div className="mb-3 flex items-center gap-2">
-        <Microscope size={17} className="text-blue-700" />
-        <h2 className="text-[14px] font-bold text-slate-900">
-          Experimental Data Snapshot
-        </h2>
+    <div>
+      <div className="flex gap-2">
+        <div className="flex h-40 flex-col justify-between py-0.5 text-right font-mono text-[12px] text-slate-400">
+          <span>{max.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</span>
+          <span>0</span>
+        </div>
+        <div className="min-w-0 flex-1 overflow-x-auto rounded-md border border-slate-200 bg-white">
+        <svg viewBox={`0 0 ${width} ${height}`} className="h-40 w-full min-w-[480px]" preserveAspectRatio="none" role="img" aria-label="Contacts anormaux par fenêtre de 9 résidus">
+          {[0.2, 0.5].map((t) => (
+            <line
+              key={t}
+              x1={0}
+              x2={width}
+              y1={yOf(t)}
+              y2={yOf(t)}
+              stroke={t === 0.5 ? "#dc2626" : "#d97706"}
+              strokeDasharray="4 4"
+              strokeWidth={1}
+              vectorEffect="non-scaling-stroke"
+              opacity={0.6}
+            />
+          ))}
+          {windows.map((w, i) => {
+            const h = w.error_value > 0 ? Math.max(height - yOf(w.error_value), 2) : 0;
+            const active = activeRange?.start === w.start && activeRange?.end === w.end;
+            return (
+              <rect
+                key={`${w.chain}-${w.start}-${i}`}
+                x={i * barW}
+                y={height - h}
+                width={Math.max(barW - (barW > 3 ? 1 : 0), 0.6)}
+                height={h}
+                fill={active ? "#7c3aed" : color[w.status]}
+                className="cursor-pointer"
+                onMouseEnter={() => setHover(w)}
+                onMouseLeave={() => setHover(null)}
+                onClick={() => onFocusRange({ start: w.start, end: w.end, label: `Fenêtre ${w.start}–${w.end}`, color: "#7c3aed", chain: w.chain, numbering: "pdb" })}
+              />
+            );
+          })}
+        </svg>
+        </div>
       </div>
-
-      <div className="grid grid-cols-3 gap-2">
-        <DataBox label="Method" value={snapshot?.method || "-"} />
-        <DataBox
-          label="Resolution"
-          value={snapshot?.resolution ? `${snapshot.resolution} Å` : "-"}
-        />
-        <DataBox label="R-Free" value={formatNumber(snapshot?.r_free)} />
-        <DataBox label="R-Work" value={formatNumber(snapshot?.r_work)} />
-        <DataBox
-          label="Release date"
-          value={snapshot?.release_date?.slice(0, 10) || "-"}
-        />
-        <DataBox
-          label="Starting model"
-          value={snapshot?.starting_model || "experimental"}
-        />
+      <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-[13px] text-slate-600">
+        <span aria-live="polite">
+          {hover
+            ? `Chaîne ${hover.chain ?? "?"} · résidus ${hover.start}–${hover.end} · ${hover.error_value.toLocaleString("fr-FR")} contact(s) anormal(aux) par résidu`
+            : `${flagged} fenêtre(s) avec contacts anormaux sur ${windows.length} · pointillés : seuils « à surveiller » (0,2) et « problématique » (0,5) · cliquez une barre pour la localiser en 3D.`}
+        </span>
+        <span className="flex gap-3">
+          <LegendDot color={color.good} label="Correcte" />
+          <LegendDot color={color.warning} label="À surveiller" />
+          <LegendDot color={color.bad} label="Problématique" />
+        </span>
       </div>
-    </section>
+    </div>
   );
 }
 
-function ValidationPanel({ validation }: { validation?: ValidationData }) {
-  return (
-    <section className="rounded border border-slate-200 bg-white p-3 shadow-sm">
-      <div className="mb-3 flex items-center gap-2">
-        <ShieldCheck size={17} className="text-rose-700" />
-        <h2 className="text-[14px] font-bold text-slate-900">
-          wwPDB Validation
-        </h2>
-      </div>
-
-      <div className="space-y-3">
-        <ValidationMetric
-          label="Clashscore"
-          value={validation?.clashscore}
-          max={50}
-        />
-        <ValidationMetric
-          label="Ramachandran outliers"
-          value={validation?.ramachandran_outliers}
-          max={10}
-          suffix="%"
-        />
-        <ValidationMetric
-          label="Sidechain outliers"
-          value={validation?.sidechain_outliers}
-          max={20}
-          suffix="%"
-        />
-        <ValidationMetric
-          label="RSRZ outliers"
-          value={validation?.rsrz_outliers}
-          max={20}
-          suffix="%"
-        />
-      </div>
-    </section>
-  );
-}
-
-function MacromoleculesPanel({
-  macromolecules,
-}: {
-  macromolecules: Macromolecule[];
-}) {
-  return (
-    <section className="rounded border border-slate-200 bg-white p-3 shadow-sm">
-      <div className="mb-3 flex items-center gap-2">
-        <Dna size={17} className="text-cyan-700" />
-        <h2 className="text-[14px] font-bold text-slate-900">
-          Macromolecules
-        </h2>
-      </div>
-
-      <div className="overflow-hidden rounded border border-slate-200">
-        <table className="w-full text-[12px]">
-          <thead>
-            <tr className="bg-[#263746] text-white">
-              <th className="p-2 text-left">Entity</th>
-              <th className="p-2 text-left">Molecule</th>
-              <th className="p-2 text-left">Chains</th>
-              <th className="p-2 text-left">Length</th>
-              <th className="p-2 text-left">Organism</th>
-              <th className="p-2 text-left">Details</th>
-              <th className="p-2 text-left">Image</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {macromolecules.length > 0 ? (
-              macromolecules.map((molecule) => (
-                <tr key={molecule.entity_id} className="border-b bg-white">
-                  <td className="p-2 font-semibold text-[#0f4c81]">
-                    {molecule.entity_id}
-                  </td>
-                  <td className="max-w-[280px] p-2 font-medium">
-                    {molecule.molecule}
-                  </td>
-                  <td className="p-2">{molecule.chains?.join(", ") || "-"}</td>
-                  <td className="p-2">{molecule.sequence_length || "-"}</td>
-                  <td className="p-2 text-[#0f4c81]">
-                    {molecule.organism || "-"}
-                  </td>
-                  <td className="p-2">{molecule.details || "-"}</td>
-                  <td className="p-2">
-                    {molecule.image_url ? (
-                      <img
-                        src={molecule.image_url}
-                        alt="macromolecule"
-                        className="h-[64px] w-[86px] rounded object-contain"
-                      />
-                    ) : (
-                      "-"
-                    )}
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={7} className="p-4 text-center text-slate-500">
-                  Aucune macromolécule disponible.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  );
-}
+// ---------------------------------------------------------------------------
+// Entrées PDB
+// ---------------------------------------------------------------------------
 
 function PDBTable({
   structures,
+  total,
   selected,
   onSelect,
 }: {
   structures: PDBStructure[];
+  total?: number;
   selected: PDBStructure | null;
-  onSelect: (structure: PDBStructure) => void;
+  onSelect: (s: PDBStructure) => void;
 }) {
-  return (
-    <section className="rounded border border-slate-200 bg-white p-3 shadow-sm">
-      <div className="mb-3 flex items-center gap-2">
-        <Database size={16} className="text-[#0f4c81]" />
-        <h2 className="text-[14px] font-bold text-slate-900">
-          Associated PDB structures
-        </h2>
-      </div>
+  const [method, setMethod] = useState("all");
+  const methods = Array.from(new Set(structures.map((s) => s.method)));
+  const rows = method === "all" ? structures : structures.filter((s) => s.method === method);
 
-      <div className="max-h-[430px] overflow-auto rounded border border-slate-200">
-        <table className="w-full text-[12px]">
-          <thead className="sticky top-0 bg-[#e8f1f8] text-[#0f4c81]">
+  return (
+    <Card
+      eyebrow="RCSB PDB"
+      title={`Structures expérimentales (${total ?? structures.length})`}
+      icon={<Database size={16} />}
+      tone="#0f4c81"
+      actions={
+        methods.length > 1 && (
+          <select
+            value={method}
+            onChange={(e) => setMethod(e.target.value)}
+            className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[14px]"
+            aria-label="Filtrer par méthode"
+          >
+            <option value="all">Toutes les méthodes</option>
+            {methods.map((m) => (
+              <option key={m} value={m}>
+                {shortMethod(m)}
+              </option>
+            ))}
+          </select>
+        )
+      }
+    >
+      {total != null && total > structures.length && (
+        <p className="mb-2 text-[13px] text-slate-500">
+          Les {structures.length} premières entrées sur {total} sont affichées.
+        </p>
+      )}
+      <div className="max-h-[520px] overflow-auto rounded-md border border-slate-200">
+        <table className="w-full text-[14px]">
+          <thead className="sticky top-0 bg-slate-50 text-[13px] text-slate-600">
             <tr>
-              <th className="p-2 text-left">PDB ID</th>
-              <th className="p-2 text-left">Title</th>
-              <th className="p-2 text-left">Method</th>
-              <th className="p-2 text-left">Resolution</th>
-              <th className="p-2 text-left">Release</th>
-              <th className="p-2 text-left">Action</th>
+              <th className="px-3 py-2 text-left font-semibold">PDB</th>
+              <th className="px-3 py-2 text-left font-semibold">Titre</th>
+              <th className="px-3 py-2 text-left font-semibold">Méthode</th>
+              <th className="px-3 py-2 text-right font-semibold">Résolution</th>
+              <th className="px-3 py-2 text-right font-semibold">Couverture</th>
+              <th className="px-3 py-2 text-right font-semibold">Clashscore</th>
+              <th className="px-3 py-2 text-left font-semibold">Chaînes</th>
+              <th className="px-3 py-2 text-right font-semibold">Date</th>
+              <th className="px-3 py-2" />
             </tr>
           </thead>
-
           <tbody>
-            {structures.length > 0 ? (
-              structures.map((structure) => (
+            {rows.length ? (
+              rows.map((s) => (
                 <tr
-                  key={structure.pdb_id}
-                  className={`border-b border-slate-100 ${
-                    selected?.pdb_id === structure.pdb_id
-                      ? "bg-blue-50"
-                      : "bg-white hover:bg-slate-50"
-                  }`}
+                  key={s.pdb_id}
+                  className={`border-t border-slate-100 ${selected?.pdb_id === s.pdb_id ? "bg-blue-50" : "hover:bg-slate-50"}`}
                 >
-                  <td className="p-2 font-semibold text-[#0f4c81]">
-                    {structure.pdb_id}
+                  <td className="px-3 py-1.5">
+                    <a
+                      href={`https://www.rcsb.org/structure/${s.pdb_id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-mono font-semibold text-[#0f4c81] hover:underline"
+                    >
+                      {s.pdb_id}
+                    </a>
                   </td>
-                  <td className="max-w-[520px] truncate p-2 text-slate-700">
-                    {structure.title}
+                  <td className="max-w-[420px] truncate px-3 py-1.5 text-slate-700" title={s.title}>
+                    {s.title}
                   </td>
-                  <td className="p-2">{structure.method}</td>
-                  <td className="p-2">
-                    {structure.resolution ? `${structure.resolution} Å` : "-"}
-                  </td>
-                  <td className="p-2">
-                    {structure.release_date
-                      ? structure.release_date.slice(0, 10)
-                      : "-"}
-                  </td>
-                  <td className="p-2">
+                  <td className="whitespace-nowrap px-3 py-1.5">{shortMethod(s.method)}</td>
+                  <td className="px-3 py-1.5 text-right font-mono">{fmt(s.resolution, 2, " Å")}</td>
+                  <td className="px-3 py-1.5 text-right font-mono">{fmt(s.coverage_percent, 0, " %")}</td>
+                  <td className="px-3 py-1.5 text-right font-mono">{fmt(s.validation?.clashscore, 1)}</td>
+                  <td className="px-3 py-1.5 font-mono">{s.chains?.join(", ") || "—"}</td>
+                  <td className="px-3 py-1.5 text-right">{s.release_date?.slice(0, 10) || "—"}</td>
+                  <td className="px-3 py-1.5 text-right">
                     <button
-                      onClick={() => onSelect(structure)}
-                      className="inline-flex items-center gap-1 rounded bg-[#0f4c81] px-2 py-1 text-[10px] font-semibold text-white"
+                      onClick={() => onSelect(s)}
+                      className="inline-flex items-center gap-1 rounded bg-[#0f4c81] px-2 py-0.5 text-[13px] font-semibold text-white hover:bg-[#0c3d68]"
                     >
                       <Eye size={12} />
-                      View
+                      3D
                     </button>
                   </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={6} className="p-4 text-center text-slate-500">
+                <td colSpan={9} className="p-4 text-center text-slate-500">
                   Aucune structure PDB trouvée.
                 </td>
               </tr>
@@ -1977,224 +1858,64 @@ function PDBTable({
           </tbody>
         </table>
       </div>
-    </section>
+    </Card>
   );
 }
 
-function Tab({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
+function MacromoleculesPanel({ structure }: { structure: PDBStructure }) {
+  const molecules = structure.macromolecules ?? [];
   return (
-    <button
-      onClick={onClick}
-      className={`whitespace-nowrap rounded px-3 py-2 text-[12px] font-semibold transition ${
-        active
-          ? "bg-[#0f4c81] text-white shadow-sm"
-          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
-
-function FeatureCard({
-  title,
-  text,
-  onClick,
-}: {
-  title: string;
-  text: string;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={!onClick}
-      className={`rounded border border-slate-200 bg-white p-4 text-left shadow-sm transition ${
-        onClick
-          ? "hover:border-[#0f4c81] hover:bg-slate-50"
-          : "cursor-default"
-      }`}
-    >
-      <p className="text-[13px] font-bold text-slate-900">{title}</p>
-      <p className="mt-1 text-[12px] leading-5 text-slate-600">{text}</p>
-    </button>
-  );
-}
-
-function UniPanel({
-  title,
-  icon,
-  children,
-}: {
-  title: string;
-  icon: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <section className="rounded border border-slate-200 bg-white p-2.5 shadow-sm">
-      <div className="mb-2 flex items-center gap-2 border-b border-slate-100 pb-1.5">
-        <span className="text-[#0f4c81]">{icon}</span>
-        <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-slate-700">
-          {title}
-        </p>
+    <Card eyebrow={structure.pdb_id} title="Entités polymères" icon={<Dna size={16} />} tone="#0891b2">
+      <div className="overflow-x-auto rounded-md border border-slate-200">
+        <table className="w-full text-[14px]">
+          <thead className="bg-slate-50 text-[13px] text-slate-600">
+            <tr>
+              <th className="px-3 py-2 text-left font-semibold">Entité</th>
+              <th className="px-3 py-2 text-left font-semibold">Molécule</th>
+              <th className="px-3 py-2 text-left font-semibold">Chaînes</th>
+              <th className="px-3 py-2 text-right font-semibold">Longueur</th>
+              <th className="px-3 py-2 text-left font-semibold">Organisme</th>
+            </tr>
+          </thead>
+          <tbody>
+            {molecules.length ? (
+              molecules.map((m) => (
+                <tr key={m.entity_id} className={`border-t border-slate-100 ${m.is_target ? "bg-blue-50/60" : ""}`}>
+                  <td className="px-3 py-1.5 font-mono">{m.entity_id}</td>
+                  <td className="px-3 py-1.5">
+                    {m.molecule}
+                    {m.is_target && (
+                      <span className="ml-2 rounded bg-blue-600 px-1.5 py-0.5 text-[12px] font-semibold text-white">
+                        protéine étudiée
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-1.5 font-mono">{m.chains.join(", ") || "—"}</td>
+                  <td className="px-3 py-1.5 text-right font-mono">{m.sequence_length}</td>
+                  <td className="px-3 py-1.5 italic text-slate-600">{m.organism}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={5} className="p-4 text-center text-slate-500">
+                  Aucune entité décrite.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
-      {children}
-    </section>
+    </Card>
   );
 }
 
-function SourceCard({
-  icon,
-  title,
-  subtitle,
-  active = false,
-  onClick,
-}: {
-  icon: ReactNode;
-  title: string;
-  subtitle: string;
-  active?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`mb-2 flex w-full items-center gap-3 rounded border px-3 py-2 text-left transition ${
-        active
-          ? "border-[#0f4c81] bg-[#e8f1f8] text-[#0f4c81]"
-          : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-white"
-      }`}
-    >
-      {icon}
-      <span>
-        <p className="text-[12px] font-bold">{title}</p>
-        <p className="text-[10px] opacity-70">{subtitle}</p>
-      </span>
-    </button>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="mb-1 flex justify-between gap-2 rounded bg-slate-50 px-2 py-1 text-[11px]">
-      <span className="shrink-0 text-slate-500">{label}</span>
-      <span className="truncate text-right font-semibold text-slate-800">
-        {value}
-      </span>
-    </div>
-  );
-}
-
-function Legend({ color, label }: { color: string; label: string }) {
-  return (
-    <div className="mb-1 flex items-center gap-2 text-[11px] text-slate-700">
-      <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: color }} />
-      <span>{label}</span>
-    </div>
-  );
-}
-
-function DataBox({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded border border-blue-100 bg-blue-50/60 p-3">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0f4c81]">
-        {label}
-      </p>
-      <p className="mt-1 text-[14px] font-bold text-slate-900">{value}</p>
-    </div>
-  );
-}
-
-function QualityBar({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="mb-3">
-      <div className="mb-1 flex justify-between text-[11px]">
-        <span className="text-slate-600">{label}</span>
-        <span className="font-semibold text-slate-800">{value}%</span>
-      </div>
-      <div className="h-2 rounded-full bg-slate-200">
-        <div
-          className="h-2 rounded-full bg-[#0f4c81]"
-          style={{ width: `${value}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function ValidationMetric({
-  label,
-  value,
-  max,
-  suffix = "",
-}: {
-  label: string;
-  value?: number | null;
-  max: number;
-  suffix?: string;
-}) {
-  const numeric = typeof value === "number" ? value : null;
-  const percent = numeric !== null ? Math.min(100, (numeric / max) * 100) : 0;
-
-  return (
-    <div>
-      <div className="mb-1 flex justify-between text-[11px]">
-        <span className="font-medium text-slate-700">{label}</span>
-        <span className="text-slate-500">
-          {numeric !== null ? `${numeric}${suffix}` : "-"}
-        </span>
-      </div>
-      <div className="h-4 overflow-hidden rounded-full bg-gradient-to-r from-blue-600 via-white to-red-500">
-        <div
-          className="h-4 w-[2px] bg-black"
-          style={{ marginLeft: `${percent}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function ConfidenceLegend() {
-  return (
-    <div className="space-y-2 text-[11px]">
-      <LegendLine color="bg-blue-700" label="Very high" value="pLDDT > 90" />
-      <LegendLine color="bg-cyan-400" label="High" value="70 < pLDDT < 90" />
-      <LegendLine color="bg-yellow-300" label="Low" value="50 < pLDDT < 70" />
-      <LegendLine color="bg-orange-400" label="Very low" value="pLDDT < 50" />
-    </div>
-  );
-}
-
-function LegendLine({
-  color,
-  label,
-  value,
-}: {
-  color: string;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-2 rounded bg-slate-50 px-2 py-1">
-      <div className="flex items-center gap-2">
-        <span className={`h-3 w-3 rounded-sm ${color}`} />
-        <span className="font-medium text-slate-700">{label}</span>
-      </div>
-      <span className="text-slate-500">{value}</span>
-    </div>
-  );
-}
-
-function formatNumber(value?: number | null) {
-  if (typeof value !== "number") return "-";
-  return value.toFixed(3);
+function shortMethod(method?: string) {
+  const m = (method || "").toUpperCase();
+  if (m.includes("X-RAY")) return "Diffraction X";
+  if (m.includes("ELECTRON MICROSCOPY")) return "Cryo-EM";
+  if (m.includes("SOLUTION NMR")) return "RMN en solution";
+  if (m.includes("SOLID-STATE NMR")) return "RMN du solide";
+  if (m.includes("ELECTRON CRYSTALLOGRAPHY")) return "Cristallographie électronique";
+  if (m.includes("NEUTRON")) return "Diffraction de neutrons";
+  return method || "—";
 }

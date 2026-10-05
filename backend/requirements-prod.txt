@@ -1,0 +1,4 @@
+# Dépendances supplémentaires en production (PostgreSQL et Redis)
+-r requirements.txt
+psycopg[binary]>=3.2,<4
+redis>=5,<7

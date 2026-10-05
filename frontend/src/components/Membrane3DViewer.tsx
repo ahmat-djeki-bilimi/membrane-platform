@@ -1,12 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-
-declare global {
-  interface Window {
-    $3Dmol?: any;
-  }
-}
+import { Download, RotateCw } from "lucide-react";
 
 type HighlightRange = {
   start: number;
@@ -15,429 +10,405 @@ type HighlightRange = {
   color?: string;
 };
 
-type TMSegment = {
-  start: number;
-  end: number;
-  label?: string;
-  source?: string;
-  confidence?: string;
-  hydrophobic_score?: number;
+export type OPMSubunit = {
+  chain: string;
+  name?: string | null;
+  tilt?: number | null;
+  segments: { start: number; end: number }[];
 };
 
-type Atom3D = {
-  x: number;
-  y: number;
-  z: number;
-  resi?: number;
-};
+type ColorMode = "chain" | "tm" | "spectrum";
 
-type Geometry = {
-  center: { x: number; y: number; z: number };
-  upperZ: number;
-  lowerZ: number;
-  thickness: number;
-  firstResidue: number;
-  lastResidue: number;
-  firstTM: number;
-  lastTM: number;
-};
+const OPM_COORDINATES = "https://opm-assets.storage.googleapis.com/pdb";
+const TM_COLOR = "#d97706";
+const CHAIN_COLORS = [
+  "#2563eb", "#059669", "#7c3aed", "#db2777", "#0891b2",
+  "#65a30d", "#c2410c", "#4f46e5", "#be123c", "#0d9488",
+];
 
-const TM_COLORS = ["#ef4444", "#f97316", "#dc2626", "#fb923c", "#b91c1c"];
-
+/**
+ * Coordonnées orientées par OPM : la normale à la membrane est l’axe z et le
+ * centre de la bicouche est en z = 0. Les atomes DUM matérialisent les limites
+ * du cœur hydrophobe (nom O = face externe, N = face interne), affichés comme
+ * sur le site OPM (rouge / bleu).
+ *
+ * Les coordonnées sont tournées pour que la membrane apparaisse horizontale,
+ * face externe en haut.
+ */
 export default function Membrane3DViewer({
-  pdbId,
-  pdbUrl,
-  segments,
+  opmPdbId,
+  subunits,
+  outsideLabel = "Côté externe",
+  insideLabel = "Côté interne",
   activeRange,
 }: {
-  pdbId?: string | null;
-  pdbUrl?: string | null;
-  segments: TMSegment[];
+  opmPdbId?: string | null;
+  subunits: OPMSubunit[];
+  outsideLabel?: string;
+  insideLabel?: string;
   activeRange?: HighlightRange | null;
 }) {
-  const viewerRef = useRef<HTMLDivElement | null>(null);
-  const viewerObject = useRef<any>(null);
-  const [mode, setMode] = useState<"full" | "tm">("full");
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const viewerRef = useRef<any>(null);
+  const [pdbText, setPdbText] = useState<string | null>(null);
+  const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [colorMode, setColorMode] = useState<ColorMode>("tm");
+  const [showMembrane, setShowMembrane] = useState(true);
+  const [showLigands, setShowLigands] = useState(true);
+  const [spin, setSpin] = useState(false);
+
+  // Téléchargement et réorientation des coordonnées (une fois par structure)
+  useEffect(() => {
+    setPdbText(null);
+    if (!opmPdbId) return;
+    let cancelled = false;
+    setStatus("loading");
+    fetch(`${OPM_COORDINATES}/${opmPdbId.toLowerCase()}.pdb`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.text();
+      })
+      .then((text) => !cancelled && setPdbText(orientSideView(text)))
+      .catch((e) => {
+        console.error("Coordonnées OPM indisponibles :", e);
+        if (!cancelled) setStatus("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [opmPdbId]);
+
+  // Création du viewer
+  useEffect(() => {
+    if (!pdbText || !hostRef.current) return;
+    let cancelled = false;
+
+    import("3dmol").then(($3Dmol) => {
+      if (cancelled || !hostRef.current) return;
+      // L'ancien viewer doit cesser de tourner avant que son canevas soit retiré
+      disposeViewer(viewerRef.current);
+      viewerRef.current = null;
+      hostRef.current.innerHTML = "";
+      // Projection orthographique : les faces de la membrane restent des lignes nettes
+      const viewer = $3Dmol.createViewer(hostRef.current, {
+        backgroundColor: "white",
+        orthographic: true,
+      } as any);
+      viewer.addModel(pdbText, "pdb");
+      viewerRef.current = viewer;
+      applyStyle(viewer, { subunits, colorMode, showMembrane, showLigands, activeRange: activeRange ?? null });
+      viewer.zoomTo({ resn: "DUM", invert: true });
+      viewer.render();
+      ensureOutsideOnTop(viewer);
+      setStatus("ready");
+    });
+
+    return () => {
+      cancelled = true;
+      disposeViewer(viewerRef.current);
+      viewerRef.current = null;
+      setSpin(false);
+    };
+    // Le style est appliqué séparément pour ne pas recréer le viewer
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pdbText]);
+
+  // Mise à jour du style sans recharger la structure
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || status !== "ready") return;
+    applyStyle(viewer, { subunits, colorMode, showMembrane, showLigands, activeRange: activeRange ?? null });
+    if (activeRange) viewer.zoomTo({ resi: `${activeRange.start}-${activeRange.end}` });
+    viewer.render();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colorMode, showMembrane, showLigands, activeRange?.start, activeRange?.end, JSON.stringify(subunits), status]);
 
   useEffect(() => {
-    if (!viewerRef.current) return;
+    const viewer = viewerRef.current;
+    if (!viewer || status !== "ready") return;
+    // Rotation autour de la normale à la membrane (axe vertical)
+    viewer.spin(spin ? "y" : false, 0.6);
+  }, [spin, status]);
 
-    const load3Dmol = () => {
-      return new Promise<void>((resolve, reject) => {
-        if (window.$3Dmol) {
-          resolve();
-          return;
-        }
+  // Arrêt de la rotation quand le composant disparaît (changement d'onglet)
+  useEffect(() => () => disposeViewer(viewerRef.current), []);
 
-        const script = document.createElement("script");
-        script.src = "https://3Dmol.org/build/3Dmol-min.js";
-        script.async = true;
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error("Impossible de charger 3Dmol.js"));
-        document.body.appendChild(script);
-      });
-    };
+  if (!opmPdbId) {
+    return (
+      <div className="flex h-[460px] items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-[14px] text-slate-500">
+        Cette structure n’est pas référencée dans OPM : son orientation dans la membrane
+        n’est pas disponible.
+      </div>
+    );
+  }
 
-    const render = async () => {
-      await load3Dmol();
-
-      if (!viewerRef.current || !window.$3Dmol) return;
-
-      viewerRef.current.innerHTML = "";
-
-      const viewer = window.$3Dmol.createViewer(viewerRef.current, {
-        backgroundColor: "white",
-      });
-
-      viewerObject.current = viewer;
-
-      const url =
-        pdbUrl ||
-        (pdbId ? `https://files.rcsb.org/download/${pdbId.toUpperCase()}.pdb` : "");
-
-      if (!url) {
-        viewerRef.current.innerHTML =
-          "<div style='padding:20px;color:#64748b;font-size:13px'>Aucune structure PDB disponible.</div>";
-        return;
-      }
-
-      const response = await fetch(url);
-      const pdbText = await response.text();
-
-      const model = viewer.addModel(pdbText, "pdb");
-      const allAtoms: Atom3D[] = model.selectedAtoms({});
-      const geometry = computeGeometry(model, segments, allAtoms);
-
-      applyStyle(viewer, geometry, segments, activeRange, mode);
-
-      viewer.render();
-
-      setTimeout(() => {
-        viewer.resize();
-        viewer.render();
-      }, 300);
-    };
-
-    render().catch((error) => {
-      console.error("Erreur viewer membrane 3D:", error);
-      if (viewerRef.current) {
-        viewerRef.current.innerHTML =
-          "<div style='padding:20px;color:#dc2626;font-size:13px'>Erreur de chargement du viewer 3D membrane.</div>";
-      }
-    });
-  }, [
-    pdbId,
-    pdbUrl,
-    JSON.stringify(segments),
-    activeRange?.start,
-    activeRange?.end,
-    activeRange?.color,
-    mode,
-  ]);
-
-  const resetView = () => {
-    const viewer = viewerObject.current;
-    if (!viewer) return;
-    viewer.zoomTo();
-    viewer.zoom(1.35);
-    viewer.render();
-  };
-
-  const zoomTM = () => {
-    const viewer = viewerObject.current;
-    if (!viewer || segments.length === 0) return;
-    const first = Math.min(...segments.map((s) => s.start));
-    const last = Math.max(...segments.map((s) => s.end));
-    viewer.zoomTo({ resi: `${first}-${last}` });
-    viewer.zoom(1.9);
-    viewer.render();
-  };
+  const chains = subunits.map((s) => s.chain);
 
   return (
-    <div className="relative h-[620px] w-full overflow-hidden rounded border border-slate-200 bg-white">
-      <div className="absolute left-3 top-3 z-20 flex flex-wrap items-center gap-2 rounded border border-slate-200 bg-white/95 px-3 py-2 shadow-sm">
-        <span className="text-[11px] font-bold text-slate-800">
-          Orientation 3D professionnelle
-        </span>
-
-        <button
-          onClick={resetView}
-          className="rounded bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-700 hover:bg-slate-200"
-        >
-          Reset
-        </button>
-
-        <button
-          onClick={zoomTM}
-          className="rounded bg-orange-100 px-2 py-1 text-[10px] font-bold text-orange-800 hover:bg-orange-200"
-        >
-          Zoom TM
-        </button>
-
-        <button
-          onClick={() => setMode("full")}
-          className={`rounded px-2 py-1 text-[10px] font-bold ${
-            mode === "full"
-              ? "bg-[#0f4c81] text-white"
-              : "bg-slate-100 text-slate-700"
-          }`}
-        >
-          Full
-        </button>
-
-        <button
-          onClick={() => setMode("tm")}
-          className={`rounded px-2 py-1 text-[10px] font-bold ${
-            mode === "tm"
-              ? "bg-[#0f4c81] text-white"
-              : "bg-slate-100 text-slate-700"
-          }`}
-        >
-          TM only
-        </button>
+    <div className="overflow-hidden rounded-md border border-slate-200 bg-white">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2 text-[13px]">
+        <span className="font-semibold text-slate-800">Coloration</span>
+        <div className="inline-flex rounded-md bg-white p-0.5 ring-1 ring-slate-200">
+          {(
+            [
+              ["chain", "Chaînes"],
+              ["tm", "Segments TM"],
+              ["spectrum", "N → C"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setColorMode(key)}
+              className={`rounded px-2 py-0.5 font-semibold ${
+                colorMode === key ? "bg-slate-800 text-white" : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <label className="flex items-center gap-1 text-slate-700">
+          <input type="checkbox" checked={showMembrane} onChange={(e) => setShowMembrane(e.target.checked)} />
+          Limites de la membrane
+        </label>
+        <label className="flex items-center gap-1 text-slate-700">
+          <input type="checkbox" checked={showLigands} onChange={(e) => setShowLigands(e.target.checked)} />
+          Ligands
+        </label>
+        <div className="ml-auto flex gap-1.5">
+          <button
+            onClick={() => setSpin((v) => !v)}
+            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 font-semibold ${
+              spin ? "bg-slate-800 text-white" : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+            }`}
+          >
+            <RotateCw size={12} />
+            Rotation
+          </button>
+          <button
+            onClick={() => {
+              viewerRef.current?.zoomTo({ resn: "DUM", invert: true });
+              viewerRef.current?.render();
+            }}
+            className="rounded-md bg-white px-2 py-1 font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+          >
+            Recentrer
+          </button>
+          <a
+            href={`${OPM_COORDINATES}/${opmPdbId.toLowerCase()}.pdb`}
+            className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+          >
+            <Download size={12} />
+            PDB orienté
+          </a>
+        </div>
       </div>
 
-      <div className="absolute right-3 top-3 z-20 rounded border border-orange-200 bg-orange-50 px-3 py-1 text-[10px] font-bold text-orange-800 shadow-sm">
-        Rouge/orange = segments TM
-      </div>
+      <div className="relative h-[520px]">
+        <div ref={hostRef} className="absolute inset-0" />
 
-      <div
-        ref={viewerRef}
-        className="absolute inset-0 h-full w-full overflow-hidden"
-        style={{
-          width: "100%",
-          height: "100%",
-          contain: "layout paint size",
-        }}
-      />
+        {showMembrane && status === "ready" && (
+          <>
+            <span className="pointer-events-none absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded bg-white/90 px-2 py-1 text-[13px] font-semibold text-rose-700 shadow-sm ring-1 ring-rose-100">
+              <span className="h-2 w-2 rounded-full bg-rose-500" />▲ {outsideLabel}
+            </span>
+            <span className="pointer-events-none absolute bottom-3 left-3 z-10 flex items-center gap-1.5 rounded bg-white/90 px-2 py-1 text-[13px] font-semibold text-blue-700 shadow-sm ring-1 ring-blue-100">
+              <span className="h-2 w-2 rounded-full bg-blue-500" />▼ {insideLabel}
+            </span>
+          </>
+        )}
+
+        {colorMode === "chain" && status === "ready" && chains.length > 0 && (
+          <div className="pointer-events-none absolute right-3 top-3 z-10 max-w-[180px] rounded bg-white/90 px-2 py-1 text-[12px] text-slate-700 shadow-sm ring-1 ring-slate-200">
+            {chains.map((c, i) => (
+              <span key={c} className="mr-2 inline-flex items-center gap-1">
+                <span className="h-2 w-2 rounded-sm" style={{ backgroundColor: CHAIN_COLORS[i % CHAIN_COLORS.length] }} />
+                {c}
+              </span>
+            ))}
+          </div>
+        )}
+        {colorMode === "tm" && status === "ready" && (
+          <span className="pointer-events-none absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded bg-white/90 px-2 py-1 text-[12px] text-slate-700 shadow-sm ring-1 ring-slate-200">
+            <span className="h-2 w-2 rounded-sm" style={{ backgroundColor: TM_COLOR }} />
+            Segments TM (OPM)
+          </span>
+        )}
+
+        {status === "loading" && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-white text-[14px] text-slate-500">
+            Chargement des coordonnées orientées…
+          </div>
+        )}
+        {status === "error" && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-white text-[14px] text-rose-600">
+            Coordonnées OPM indisponibles pour {opmPdbId.toUpperCase()}.
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
+/**
+ * Rotation des coordonnées pour une vue de côté : la normale (z) devient
+ * l’axe vertical de l’écran (y), face externe en haut.
+ */
+function orientSideView(text: string): string {
+  const lines = text.split("\n");
+
+  let outside = 0;
+  let inside = 0;
+  for (const line of lines) {
+    if (!line.startsWith("HETATM") || line.slice(17, 20) !== "DUM") continue;
+    const z = parseFloat(line.slice(46, 54));
+    const name = line.slice(12, 16).trim();
+    if (name === "O") outside += z;
+    if (name === "N") inside += z;
+  }
+  const sign = outside >= inside ? 1 : -1;
+
+  const fmt = (v: number) => v.toFixed(3).padStart(8).slice(-8);
+
+  return lines
+    // Certains fichiers OPM placent les atomes DUM après la ligne END, où
+    // 3Dmol arrête la lecture : on retire END / ENDMDL / MODEL.
+    .filter((line) => !/^(END|ENDMDL|MODEL)\b/.test(line))
+    .map((line) => {
+      if (!line.startsWith("ATOM") && !line.startsWith("HETATM")) return line;
+      const x = parseFloat(line.slice(30, 38));
+      const y = parseFloat(line.slice(38, 46));
+      const z = parseFloat(line.slice(46, 54));
+      if ([x, y, z].some(Number.isNaN)) return line;
+      // Rotation de ±90° autour de x : (x, y, z) → (x, ∓z, ±y). L’axe y du
+      // viewer pointe vers le bas de l’écran : la face externe (z > 0 dans
+      // OPM) se retrouve en haut.
+      const ny = -sign * z;
+      const nz = sign * y;
+      return line.slice(0, 30) + fmt(x) + fmt(ny) + fmt(nz) + line.slice(54);
+    })
+    .join("\n");
+}
+
 function applyStyle(
   viewer: any,
-  geometry: Geometry,
-  segments: TMSegment[],
-  activeRange: HighlightRange | null | undefined,
-  mode: "full" | "tm"
+  {
+    subunits,
+    colorMode,
+    showMembrane,
+    showLigands,
+    activeRange,
+  }: {
+    subunits: OPMSubunit[];
+    colorMode: ColorMode;
+    showMembrane: boolean;
+    showLigands: boolean;
+    activeRange: HighlightRange | null;
+  }
 ) {
   viewer.setStyle({}, {});
+  viewer.removeAllShapes();
+  viewer.removeAllLabels();
 
-  if (mode === "full") {
-    viewer.setStyle(
-      {},
-      {
-        cartoon: {
-          color: "#94a3b8",
-          opacity: 0.56,
-        },
+  if (colorMode === "spectrum") {
+    viewer.setStyle({ hetflag: false }, { cartoon: { color: "spectrum" } });
+  } else if (colorMode === "tm") {
+    viewer.setStyle({ hetflag: false }, { cartoon: { color: "#cbd5e1" } });
+    for (const subunit of subunits) {
+      for (const seg of subunit.segments) {
+        viewer.setStyle(
+          { chain: subunit.chain, resi: `${seg.start}-${seg.end}` },
+          { cartoon: { color: TM_COLOR } }
+        );
       }
-    );
-  } else {
-    viewer.setStyle(
-      {},
-      {
-        cartoon: {
-          color: "#cbd5e1",
-          opacity: 0.18,
-        },
-      }
-    );
-  }
-
-  segments.forEach((segment, index) => {
-    const color = TM_COLORS[index % TM_COLORS.length];
-
-    viewer.setStyle(
-      { resi: `${segment.start}-${segment.end}` },
-      {
-        cartoon: {
-          color,
-          opacity: 1,
-        },
-        stick: {
-          color,
-          radius: mode === "tm" ? 0.18 : 0.10,
-          opacity: mode === "tm" ? 0.85 : 0.45,
-        },
-      }
-    );
-  });
-
-  viewer.setStyle(
-    { resi: `${geometry.firstResidue}-${geometry.firstResidue + 4}` },
-    {
-      cartoon: { color: "#059669" },
-      sphere: { color: "#059669", radius: 0.8 },
     }
-  );
-
-  viewer.setStyle(
-    { resi: `${Math.max(geometry.lastResidue - 4, 1)}-${geometry.lastResidue}` },
-    {
-      cartoon: { color: "#e11d48" },
-      sphere: { color: "#e11d48", radius: 0.8 },
-    }
-  );
-
-  if (activeRange) {
-    viewer.setStyle(
-      { resi: `${activeRange.start}-${activeRange.end}` },
-      {
-        cartoon: {
-          color: activeRange.color || "#7c3aed",
-          opacity: 1,
+    // Numérotation des segments sur la première chaîne
+    const first = subunits[0];
+    first?.segments.forEach((seg, i) => {
+      const mid = Math.round((seg.start + seg.end) / 2);
+      viewer.addLabel(
+        `TM${i + 1}`,
+        {
+          fontSize: 12,
+          fontColor: "white",
+          backgroundColor: "#b45309",
+          backgroundOpacity: 0.95,
+          borderRadius: 4,
+          inFront: true,
         },
-        stick: {
-          color: activeRange.color || "#7c3aed",
-          radius: 0.25,
-        },
-      }
-    );
-  }
-
-  const size = 78;
-  const center = geometry.center;
-
-  viewer.addBox({
-    center: { x: center.x, y: center.y, z: geometry.upperZ },
-    dimensions: { w: size, h: size, d: 1.8 },
-    color: "#3b82f6",
-    opacity: 0.32,
-  });
-
-  viewer.addBox({
-    center: { x: center.x, y: center.y, z: geometry.lowerZ },
-    dimensions: { w: size, h: size, d: 1.8 },
-    color: "#3b82f6",
-    opacity: 0.32,
-  });
-
-  viewer.addBox({
-    center: { x: center.x, y: center.y, z: center.z },
-    dimensions: { w: size, h: size, d: Math.max(22, geometry.thickness) },
-    color: "#fb923c",
-    opacity: 0.16,
-  });
-
-  viewer.addLabel("Extracellulaire", {
-    position: { x: center.x - 34, y: center.y - 30, z: geometry.upperZ + 5 },
-    fontColor: "#0f4c81",
-    backgroundColor: "white",
-    fontSize: 12,
-    borderThickness: 1,
-    borderColor: "#bfdbfe",
-  });
-
-  viewer.addLabel("Intracellulaire / Cytoplasmique", {
-    position: { x: center.x - 34, y: center.y - 30, z: geometry.lowerZ - 5 },
-    fontColor: "#0f4c81",
-    backgroundColor: "white",
-    fontSize: 12,
-    borderThickness: 1,
-    borderColor: "#bfdbfe",
-  });
-
-  viewer.addLabel("N-ter", {
-    sel: { resi: geometry.firstResidue },
-    fontColor: "white",
-    backgroundColor: "#059669",
-    fontSize: 11,
-  });
-
-  viewer.addLabel("C-ter", {
-    sel: { resi: geometry.lastResidue },
-    fontColor: "white",
-    backgroundColor: "#e11d48",
-    fontSize: 11,
-  });
-
-  segments.forEach((segment, index) => {
-    const mid = Math.round((segment.start + segment.end) / 2);
-
-    viewer.addLabel(segment.label || `TM${index + 1}`, {
-      sel: { resi: mid },
-      fontColor: "white",
-      backgroundColor: TM_COLORS[index % TM_COLORS.length],
-      fontSize: 11,
+        { chain: first.chain, resi: mid, atom: "CA" }
+      );
     });
-  });
+  } else {
+    viewer.setStyle({ hetflag: false }, { cartoon: { color: "#94a3b8" } });
+    subunits.forEach((subunit, i) => {
+      viewer.setStyle(
+        { chain: subunit.chain, hetflag: false },
+        { cartoon: { color: CHAIN_COLORS[i % CHAIN_COLORS.length] } }
+      );
+    });
+  }
+
+  if (showLigands) {
+    viewer.setStyle(
+      { hetflag: true, not: { resn: ["DUM", "HOH", "WAT"] } },
+      { stick: { radius: 0.18, colorscheme: "greenCarbon" } }
+    );
+  }
+
+  if (showMembrane) {
+    // Limites du cœur hydrophobe : O (face externe) en rouge, N (face interne) en bleu
+    viewer.setStyle({ resn: "DUM", atom: "O" }, { sphere: { radius: 0.5, color: "#e11d48" } });
+    viewer.setStyle({ resn: "DUM", atom: "N" }, { sphere: { radius: 0.5, color: "#2563eb" } });
+    drawHydrophobicCore(viewer);
+  }
 
   if (activeRange) {
-    viewer.zoomTo({ resi: `${activeRange.start}-${activeRange.end}` });
-    viewer.zoom(1.7);
-  } else {
-    viewer.zoomTo({ resi: `${geometry.firstTM}-${geometry.lastTM}` });
-    viewer.zoom(1.35);
+    const color = activeRange.color || "#7c3aed";
+    viewer.addStyle(
+      { resi: `${activeRange.start}-${activeRange.end}`, hetflag: false },
+      { stick: { color, radius: 0.22 } }
+    );
   }
-
-  viewer.rotate(55, "x");
-  viewer.rotate(-18, "y");
 }
 
-function computeGeometry(model: any, segments: TMSegment[], allAtoms: Atom3D[]): Geometry {
-  const residues = allAtoms
-    .map((atom) => atom.resi)
-    .filter((resi): resi is number => typeof resi === "number");
-
-  const firstResidue = residues.length ? Math.min(...residues) : 1;
-  const lastResidue = residues.length ? Math.max(...residues) : 1;
-
-  const firstTM = segments.length ? Math.min(...segments.map((s) => s.start)) : firstResidue;
-  const lastTM = segments.length ? Math.max(...segments.map((s) => s.end)) : lastResidue;
-
-  let tmAtoms: Atom3D[] = [];
-
-  segments.forEach((segment) => {
-    const atoms = model.selectedAtoms({
-      resi: `${segment.start}-${segment.end}`,
-    }) as Atom3D[];
-
-    tmAtoms = [...tmAtoms, ...atoms];
+/** Cœur hydrophobe : bande translucide entre les deux faces (axe y après rotation). */
+function drawHydrophobicCore(viewer: any) {
+  const dummies: { x: number; y: number; z: number }[] = viewer.selectedAtoms({ resn: "DUM" });
+  if (!dummies.length) return;
+  const xs = dummies.map((a) => a.x);
+  const ys = dummies.map((a) => a.y);
+  const zs = dummies.map((a) => a.z);
+  const span = (v: number[]) => Math.max(...v) - Math.min(...v);
+  const mid = (v: number[]) => (Math.max(...v) + Math.min(...v)) / 2;
+  viewer.addBox({
+    center: { x: mid(xs), y: mid(ys), z: mid(zs) },
+    dimensions: { w: span(xs), h: span(ys), d: span(zs) },
+    color: "#fde68a",
+    opacity: 0.18,
   });
-
-  if (!tmAtoms.length) {
-    tmAtoms = allAtoms;
-  }
-
-  const center = averagePosition(tmAtoms);
-  const zValues = tmAtoms.map((atom) => atom.z).filter((z) => typeof z === "number");
-  const zMin = zValues.length ? Math.min(...zValues) : center.z - 12;
-  const zMax = zValues.length ? Math.max(...zValues) : center.z + 12;
-
-  const observedThickness = Math.abs(zMax - zMin);
-  const thickness = Math.max(24, Math.min(36, observedThickness || 30));
-
-  return {
-    center,
-    upperZ: center.z + thickness / 2,
-    lowerZ: center.z - thickness / 2,
-    thickness,
-    firstResidue,
-    lastResidue,
-    firstTM,
-    lastTM,
-  };
 }
 
-function averagePosition(atoms: Atom3D[]) {
-  if (!atoms.length) {
-    return { x: 0, y: 0, z: 0 };
+/** Vérifie à l’écran que la face externe (DUM « O ») est au-dessus de la face interne. */
+function ensureOutsideOnTop(viewer: any) {
+  const outer = viewer.selectedAtoms({ resn: "DUM", atom: "O" })[0];
+  const inner = viewer.selectedAtoms({ resn: "DUM", atom: "N" })[0];
+  if (!outer || !inner || typeof viewer.modelToScreen !== "function") return;
+  const o = viewer.modelToScreen({ x: outer.x, y: outer.y, z: outer.z });
+  const n = viewer.modelToScreen({ x: inner.x, y: inner.y, z: inner.z });
+  // Coordonnées écran : y croît vers le bas
+  if (o && n && o.y > n.y) {
+    viewer.rotate(180, "z");
+    viewer.render();
   }
+}
 
-  const total = atoms.reduce(
-    (acc, atom) => {
-      acc.x += atom.x || 0;
-      acc.y += atom.y || 0;
-      acc.z += atom.z || 0;
-      return acc;
-    },
-    { x: 0, y: 0, z: 0 }
-  );
-
-  return {
-    x: total.x / atoms.length,
-    y: total.y / atoms.length,
-    z: total.z / atoms.length,
-  };
+function disposeViewer(viewer: any) {
+  if (!viewer) return;
+  try {
+    viewer.spin(false);
+    viewer.clear();
+  } catch {
+    // Canevas déjà détruit : rien à libérer
+  }
 }
