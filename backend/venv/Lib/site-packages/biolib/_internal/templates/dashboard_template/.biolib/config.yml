@@ -1,5 +1,0 @@
-biolib_version: 2
-assets: dist/
-modules:
-    main:
-        image: "assets://index.html"

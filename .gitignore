@@ -1,2 +1,21 @@
+# Dépendances
 node_modules/
+backend/venv/
+.venv/
+
+# Builds et caches
+frontend/.next/
+frontend/.next-check/
+frontend/out/
+__pycache__/
+*.pyc
+.pytest_cache/
+backend/.cache/
+backend/data/
+
+# Bases de données locales et secrets
+*.db
+*.sqlite3
 .env
+.env.local
+!.env.example

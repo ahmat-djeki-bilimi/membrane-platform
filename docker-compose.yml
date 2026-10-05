@@ -1,0 +1,63 @@
+# Déploiement complet : docker compose up --build
+# Le site est servi sur http://localhost:3000, l'API sur http://localhost:8000.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: memprot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-memprot}
+      POSTGRES_DB: memprotscope
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U memprot -d memprotscope"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  api:
+    build: ./backend
+    environment: &backend-env
+      DATABASE_URL: postgresql+psycopg://memprot:${POSTGRES_PASSWORD:-memprot}@db:5432/memprotscope
+      QUEUE_URL: redis://redis:6379/0
+      EMBEDDED_WORKER: "false"
+      AUTO_MIGRATE: "false"
+      CORS_ORIGINS: ${PUBLIC_SITE_URL:-http://localhost:3000}
+      DEEPTMHMM_ENABLED: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  worker:
+    build: ./backend
+    command: ["huey_consumer", "app.tasks.huey", "-k", "thread", "-w", "4"]
+    environment: *backend-env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+volumes:
+  db-data:
