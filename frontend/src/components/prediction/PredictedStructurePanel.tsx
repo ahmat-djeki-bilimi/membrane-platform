@@ -162,7 +162,7 @@ function Result({
   onWindow: (start: number) => void;
 }) {
   const [focus, setFocus] = useState<Range | null>(null);
-  const helices = result.helices ?? [];
+  const helices = useMemo(() => result.helices ?? [], [result]);
   const membrane = result.membrane;
   const crossing = helices.filter((h) => h.crosses).length;
   const plddtByNumber = useMemo(() => new Map(result.residues.map((r) => [r.number, r.plddt])), [result]);

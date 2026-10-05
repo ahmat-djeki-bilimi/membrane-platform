@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import type { GLViewer } from "3dmol";
 
 type MiniProteinViewerProps = {
   pdbId: string;
@@ -14,8 +15,9 @@ export default function MiniProteinViewer({
   const hostRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    const host = hostRef.current;
     let mounted = true;
-    let viewer: any = null;
+    let viewer: GLViewer | null = null;
     let frameId = 0;
 
     const run = async () => {
@@ -66,9 +68,7 @@ export default function MiniProteinViewer({
           viewer.render();
         } catch {}
       }
-      if (hostRef.current) {
-        hostRef.current.innerHTML = "";
-      }
+      if (host) host.innerHTML = "";
     };
   }, [pdbId, speed]);
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import type { GLViewer } from "3dmol";
 
 type HighlightRange = {
   start: number;
@@ -34,12 +35,20 @@ export default function Structure3DViewer({
   colorRanges = [],
 }: Structure3DViewerProps) {
   const viewerRef = useRef<HTMLDivElement | null>(null);
+  // Clés stables : le viewer n'est recréé que si le contenu des plages change
+  const highlightKey = JSON.stringify(highlightRanges);
+  const autoHighlightKey = JSON.stringify(autoHighlightRanges);
+  const colorKey = JSON.stringify(colorRanges);
 
   useEffect(() => {
+    const host = viewerRef.current;
+    const highlights: HighlightRange[] = JSON.parse(highlightKey);
+    const autoHighlights: HighlightRange[] = JSON.parse(autoHighlightKey);
+    const colors: HighlightRange[] = JSON.parse(colorKey);
     let mounted = true;
-    let viewer: any = null;
+    let viewer: GLViewer | null = null;
 
-    const colorByPlddt = (atom: any) => {
+    const colorByPlddt = (atom: { b?: number; properties?: { b?: number } }) => {
       const b = Number(atom?.b || atom?.properties?.b || 0);
       if (b >= 90) return "#1f4e9d";
       if (b >= 70) return "#37a2d8";
@@ -53,57 +62,26 @@ export default function Structure3DViewer({
       return residues;
     };
 
-    const applyRangeStyle = (
-      range: HighlightRange,
-      color: string,
-      focused = false
-    ) => {
-      const residues = buildResidueList(range.start, range.end);
+    const selection = (range: HighlightRange) => ({
+      resi: buildResidueList(range.start, range.end),
+      ...(range.chain ? { chain: range.chain } : {}),
+    });
 
-      viewer.setStyle(
-        { resi: residues, ...(range.chain ? { chain: range.chain } : {}) },
-        {
-          cartoon: {
-            color,
-            thickness: focused ? 1.1 : 0.75,
-          },
-        }
-      );
-
-      viewer.addStyle(
-        { resi: residues, ...(range.chain ? { chain: range.chain } : {}) },
-        {
-          stick: {
-            color,
-            radius: focused ? 0.18 : 0.12,
-          },
-        }
-      );
-
-      if (focused) {
-        viewer.addStyle(
-          { resi: residues, ...(range.chain ? { chain: range.chain } : {}) },
-          {
-            sphere: {
-              color,
-              radius: 0.28,
-              opacity: 0.65,
-            },
-          }
-        );
-      }
+    const applyRangeStyle = (v: GLViewer, range: HighlightRange, color: string, focused = false) => {
+      v.setStyle(selection(range), { cartoon: { color, thickness: focused ? 1.1 : 0.75 } });
+      v.addStyle(selection(range), { stick: { color, radius: focused ? 0.18 : 0.12 } });
+      if (focused) v.addStyle(selection(range), { sphere: { color, radius: 0.28, opacity: 0.65 } });
     };
 
     const loadViewer = async () => {
-      if (!viewerRef.current) return;
-      viewerRef.current.innerHTML = "";
+      if (!host) return;
+      host.innerHTML = "";
 
       const $3Dmol = await import("3dmol");
-      if (!mounted || !viewerRef.current) return;
+      if (!mounted) return;
 
-      viewer = $3Dmol.createViewer(viewerRef.current, {
-        backgroundColor: background,
-      });
+      const v = $3Dmol.createViewer(host, { backgroundColor: background });
+      viewer = v;
 
       let structureData = pdbText;
 
@@ -113,59 +91,30 @@ export default function Structure3DViewer({
       }
 
       if (!structureData && pdbId) {
-        const response = await fetch(
-          `https://files.rcsb.org/view/${pdbId.toUpperCase()}.pdb`
-        );
+        const response = await fetch(`https://files.rcsb.org/view/${pdbId.toUpperCase()}.pdb`);
         structureData = await response.text();
       }
 
       if (!structureData || !mounted) return;
 
-      viewer.addModel(structureData, "pdb");
+      v.addModel(structureData, "pdb");
 
       if (mode === "alphafold") {
-        viewer.setStyle(
-          {},
-          {
-            cartoon: {
-              colorfunc: colorByPlddt,
-              thickness: 0.55,
-            },
-          }
-        );
+        v.setStyle({}, { cartoon: { colorfunc: colorByPlddt, thickness: 0.55 } });
       } else {
-        viewer.setStyle({}, { cartoon: { color: "#94a3b8", thickness: 0.55 } });
+        v.setStyle({}, { cartoon: { color: "#94a3b8", thickness: 0.55 } });
       }
 
-      colorRanges.forEach((range) => {
-        viewer.setStyle(
-          {
-            resi: buildResidueList(range.start, range.end),
-            ...(range.chain ? { chain: range.chain } : {}),
-          },
-          { cartoon: { color: range.color || "#94a3b8", thickness: 0.55 } }
-        );
+      colors.forEach((range) => {
+        v.setStyle(selection(range), { cartoon: { color: range.color || "#94a3b8", thickness: 0.55 } });
       });
+      autoHighlights.forEach((range) => applyRangeStyle(v, range, range.color || "#f59e0b", false));
+      highlights.forEach((range) => applyRangeStyle(v, range, range.color || "#ef4444", true));
 
-      autoHighlightRanges.forEach((range) => {
-        applyRangeStyle(range, range.color || "#f59e0b", false);
-      });
+      if (highlights.length > 0) v.zoomTo(selection(highlights[0]));
+      else v.zoomTo();
 
-      highlightRanges.forEach((range) => {
-        applyRangeStyle(range, range.color || "#ef4444", true);
-      });
-
-      if (highlightRanges.length > 0) {
-        const first = highlightRanges[0];
-        viewer.zoomTo({
-          resi: buildResidueList(first.start, first.end),
-          ...(first.chain ? { chain: first.chain } : {}),
-        });
-      } else {
-        viewer.zoomTo();
-      }
-
-      viewer.render();
+      v.render();
     };
 
     loadViewer().catch((err) => {
@@ -174,28 +123,17 @@ export default function Structure3DViewer({
 
     return () => {
       mounted = false;
-
       if (viewer) {
         try {
           viewer.clear();
           viewer.render();
-        } catch {}
+        } catch {
+          // Canevas déjà détruit : rien à libérer
+        }
       }
-
-      if (viewerRef.current) {
-        viewerRef.current.innerHTML = "";
-      }
+      if (host) host.innerHTML = "";
     };
-  }, [
-    pdbId,
-    pdbUrl,
-    pdbText,
-    background,
-    mode,
-    JSON.stringify(highlightRanges),
-    JSON.stringify(autoHighlightRanges),
-    JSON.stringify(colorRanges),
-  ]);
+  }, [pdbId, pdbUrl, pdbText, background, mode, highlightKey, autoHighlightKey, colorKey]);
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-xl">

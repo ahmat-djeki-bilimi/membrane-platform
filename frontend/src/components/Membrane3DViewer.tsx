@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Download, RotateCw } from "lucide-react";
 import { PLDDT_BANDS, plddtColor } from "@/lib/prediction";
 import { downloadText } from "@/lib/sequence";
+import type { AtomSelectionSpec, GLViewer, LabelSpec } from "3dmol";
 
 type HighlightRange = {
   start: number;
@@ -63,7 +64,7 @@ export default function Membrane3DViewer({
   activeRange?: HighlightRange | null;
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
-  const viewerRef = useRef<any>(null);
+  const viewerRef = useRef<GLViewer | null>(null);
   const [pdbText, setPdbText] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [colorMode, setColorMode] = useState<ColorMode>(defaultColorMode);
@@ -113,7 +114,7 @@ export default function Membrane3DViewer({
       const viewer = $3Dmol.createViewer(hostRef.current, {
         backgroundColor: "white",
         orthographic: true,
-      } as any);
+      } as Parameters<typeof $3Dmol.createViewer>[1]);
       viewer.addModel(pdbText, "pdb");
       viewerRef.current = viewer;
       applyStyle(viewer, { subunits, colorMode, showMembrane, showLigands, activeRange: activeRange ?? null });
@@ -341,7 +342,7 @@ export function orientSideView(text: string): string {
 }
 
 function applyStyle(
-  viewer: any,
+  viewer: GLViewer,
   {
     subunits,
     colorMode,
@@ -388,7 +389,7 @@ function applyStyle(
           backgroundOpacity: 0.95,
           borderRadius: 4,
           inFront: true,
-        },
+        } as LabelSpec,
         { chain: first.chain, resi: mid, atom: "CA" }
       );
     });
@@ -404,7 +405,8 @@ function applyStyle(
 
   if (showLigands) {
     viewer.setStyle(
-      { hetflag: true, not: { resn: ["DUM", "HOH", "WAT"] } },
+      // Liste de noms acceptée par 3Dmol, absente de ses types
+      { hetflag: true, not: { resn: ["DUM", "HOH", "WAT"] } } as unknown as AtomSelectionSpec,
       { stick: { radius: 0.18, colorscheme: "greenCarbon" } }
     );
   }
@@ -426,8 +428,8 @@ function applyStyle(
 }
 
 /** Cœur hydrophobe : bande translucide entre les deux faces (axe y après rotation). */
-export function drawHydrophobicCore(viewer: any) {
-  const dummies: { x: number; y: number; z: number }[] = viewer.selectedAtoms({ resn: "DUM" });
+export function drawHydrophobicCore(viewer: GLViewer) {
+  const dummies = viewer.selectedAtoms({ resn: "DUM" }) as { x: number; y: number; z: number }[];
   if (!dummies.length) return;
   const xs = dummies.map((a) => a.x);
   const ys = dummies.map((a) => a.y);
@@ -443,12 +445,14 @@ export function drawHydrophobicCore(viewer: any) {
 }
 
 /** Vérifie à l’écran que la face externe (DUM « O ») est au-dessus de la face interne. */
-export function ensureOutsideOnTop(viewer: any) {
+export function ensureOutsideOnTop(viewer: GLViewer) {
   const outer = viewer.selectedAtoms({ resn: "DUM", atom: "O" })[0];
   const inner = viewer.selectedAtoms({ resn: "DUM", atom: "N" })[0];
   if (!outer || !inner || typeof viewer.modelToScreen !== "function") return;
-  const o = viewer.modelToScreen({ x: outer.x, y: outer.y, z: outer.z });
-  const n = viewer.modelToScreen({ x: inner.x, y: inner.y, z: inner.z });
+  // Un seul point en entrée : 3Dmol renvoie un point, pas une liste (types inexacts)
+  type ScreenPoint = { x: number; y: number } | undefined;
+  const o = viewer.modelToScreen({ x: outer.x, y: outer.y, z: outer.z }) as unknown as ScreenPoint;
+  const n = viewer.modelToScreen({ x: inner.x, y: inner.y, z: inner.z }) as unknown as ScreenPoint;
   // Coordonnées écran : y croît vers le bas
   if (o && n && o.y > n.y) {
     viewer.rotate(180, "z");
@@ -456,7 +460,7 @@ export function ensureOutsideOnTop(viewer: any) {
   }
 }
 
-export function disposeViewer(viewer: any) {
+export function disposeViewer(viewer: GLViewer | null | undefined) {
   if (!viewer) return;
   try {
     viewer.spin(false);
