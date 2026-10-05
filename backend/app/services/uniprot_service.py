@@ -95,6 +95,26 @@ def tm_segments(entry: dict) -> list[dict]:
     return segments
 
 
+def n_terminus_side(entry: dict) -> str | None:
+    """Côté de l'extrémité N-terminale (« in » / « out ») d'après les domaines topologiques annotés."""
+    segments = tm_segments(entry)
+    if not segments:
+        return None
+    first_tm = segments[0]["start"]
+    for feature in entry.get("features", []):
+        if feature.get("type") != "Topological domain":
+            continue
+        start, end = _location(feature)
+        if not end or end >= first_tm:
+            continue
+        description = feature.get("description", "").lower()
+        if "cytoplasmic" in description:
+            return "in"
+        if any(word in description for word in ("extracellular", "lumenal", "periplasmic")):
+            return "out"
+    return None
+
+
 def domain_features(entry: dict) -> list[dict]:
     """Domaines, régions et éléments topologiques annotés."""
     domains = []

@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Download, RotateCw } from "lucide-react";
+import { PLDDT_BANDS, plddtColor } from "@/lib/prediction";
+import { downloadText } from "@/lib/sequence";
 
 type HighlightRange = {
   start: number;
@@ -17,7 +19,7 @@ export type OPMSubunit = {
   segments: { start: number; end: number }[];
 };
 
-type ColorMode = "chain" | "tm" | "spectrum";
+type ColorMode = "chain" | "tm" | "spectrum" | "plddt";
 
 const OPM_COORDINATES = "https://opm-assets.storage.googleapis.com/pdb";
 const TM_COLOR = "#d97706";
@@ -34,32 +36,50 @@ const CHAIN_COLORS = [
  *
  * Les coordonnées sont tournées pour que la membrane apparaisse horizontale,
  * face externe en haut.
+ *
+ * `coordinates` remplace le fichier OPM par des coordonnées déjà orientées de
+ * la même façon (structure prédite placée dans la membrane par le serveur),
+ * avec le pLDDT dans la colonne B-factor.
  */
 export default function Membrane3DViewer({
   opmPdbId,
+  coordinates,
+  downloadName,
   subunits,
   outsideLabel = "Côté externe",
   insideLabel = "Côté interne",
+  tmLegend = "Segments TM (OPM)",
+  defaultColorMode = "tm",
   activeRange,
 }: {
   opmPdbId?: string | null;
+  coordinates?: string | null;
+  downloadName?: string;
   subunits: OPMSubunit[];
   outsideLabel?: string;
   insideLabel?: string;
+  tmLegend?: string;
+  defaultColorMode?: ColorMode;
   activeRange?: HighlightRange | null;
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<any>(null);
   const [pdbText, setPdbText] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
-  const [colorMode, setColorMode] = useState<ColorMode>("tm");
+  const [colorMode, setColorMode] = useState<ColorMode>(defaultColorMode);
   const [showMembrane, setShowMembrane] = useState(true);
   const [showLigands, setShowLigands] = useState(true);
   const [spin, setSpin] = useState(false);
+  // Faux pour une structure prédite sans segment transmembranaire (pas d'atomes DUM)
+  const [hasMembrane, setHasMembrane] = useState(true);
 
   // Téléchargement et réorientation des coordonnées (une fois par structure)
   useEffect(() => {
     setPdbText(null);
+    if (coordinates) {
+      setPdbText(orientSideView(coordinates));
+      return;
+    }
     if (!opmPdbId) return;
     let cancelled = false;
     setStatus("loading");
@@ -76,7 +96,7 @@ export default function Membrane3DViewer({
     return () => {
       cancelled = true;
     };
-  }, [opmPdbId]);
+  }, [opmPdbId, coordinates]);
 
   // Création du viewer
   useEffect(() => {
@@ -98,8 +118,10 @@ export default function Membrane3DViewer({
       viewerRef.current = viewer;
       applyStyle(viewer, { subunits, colorMode, showMembrane, showLigands, activeRange: activeRange ?? null });
       viewer.zoomTo({ resn: "DUM", invert: true });
+      viewer.zoom(1.2);
       viewer.render();
       ensureOutsideOnTop(viewer);
+      setHasMembrane(viewer.selectedAtoms({ resn: "DUM" }).length > 0);
       setStatus("ready");
     });
 
@@ -133,7 +155,7 @@ export default function Membrane3DViewer({
   // Arrêt de la rotation quand le composant disparaît (changement d'onglet)
   useEffect(() => () => disposeViewer(viewerRef.current), []);
 
-  if (!opmPdbId) {
+  if (!opmPdbId && !coordinates) {
     return (
       <div className="flex h-[460px] items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-[14px] text-slate-500">
         Cette structure n’est pas référencée dans OPM : son orientation dans la membrane
@@ -150,11 +172,17 @@ export default function Membrane3DViewer({
         <span className="font-semibold text-slate-800">Coloration</span>
         <div className="inline-flex rounded-md bg-white p-0.5 ring-1 ring-slate-200">
           {(
-            [
-              ["chain", "Chaînes"],
-              ["tm", "Segments TM"],
-              ["spectrum", "N → C"],
-            ] as const
+            (coordinates
+              ? [
+                  ["plddt", "Confiance (pLDDT)"],
+                  ["tm", "Segments TM"],
+                  ["spectrum", "N → C"],
+                ]
+              : [
+                  ["chain", "Chaînes"],
+                  ["tm", "Segments TM"],
+                  ["spectrum", "N → C"],
+                ]) as [ColorMode, string][]
           ).map(([key, label]) => (
             <button
               key={key}
@@ -171,10 +199,12 @@ export default function Membrane3DViewer({
           <input type="checkbox" checked={showMembrane} onChange={(e) => setShowMembrane(e.target.checked)} />
           Limites de la membrane
         </label>
-        <label className="flex items-center gap-1 text-slate-700">
-          <input type="checkbox" checked={showLigands} onChange={(e) => setShowLigands(e.target.checked)} />
-          Ligands
-        </label>
+        {!coordinates && (
+          <label className="flex items-center gap-1 text-slate-700">
+            <input type="checkbox" checked={showLigands} onChange={(e) => setShowLigands(e.target.checked)} />
+            Ligands
+          </label>
+        )}
         <div className="ml-auto flex gap-1.5">
           <button
             onClick={() => setSpin((v) => !v)}
@@ -194,20 +224,30 @@ export default function Membrane3DViewer({
           >
             Recentrer
           </button>
-          <a
-            href={`${OPM_COORDINATES}/${opmPdbId.toLowerCase()}.pdb`}
-            className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
-          >
-            <Download size={12} />
-            PDB orienté
-          </a>
+          {coordinates ? (
+            <button
+              onClick={() => downloadText(downloadName || "structure_predite.pdb", coordinates)}
+              className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+            >
+              <Download size={12} />
+              PDB orienté
+            </button>
+          ) : (
+            <a
+              href={`${OPM_COORDINATES}/${opmPdbId!.toLowerCase()}.pdb`}
+              className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+            >
+              <Download size={12} />
+              PDB orienté
+            </a>
+          )}
         </div>
       </div>
 
       <div className="relative h-[520px]">
         <div ref={hostRef} className="absolute inset-0" />
 
-        {showMembrane && status === "ready" && (
+        {showMembrane && hasMembrane && status === "ready" && (
           <>
             <span className="pointer-events-none absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded bg-white/90 px-2 py-1 text-[13px] font-semibold text-rose-700 shadow-sm ring-1 ring-rose-100">
               <span className="h-2 w-2 rounded-full bg-rose-500" />▲ {outsideLabel}
@@ -231,8 +271,18 @@ export default function Membrane3DViewer({
         {colorMode === "tm" && status === "ready" && (
           <span className="pointer-events-none absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded bg-white/90 px-2 py-1 text-[12px] text-slate-700 shadow-sm ring-1 ring-slate-200">
             <span className="h-2 w-2 rounded-sm" style={{ backgroundColor: TM_COLOR }} />
-            Segments TM (OPM)
+            {tmLegend}
           </span>
+        )}
+        {colorMode === "plddt" && status === "ready" && (
+          <div className="pointer-events-none absolute right-3 top-3 z-10 space-y-0.5 rounded bg-white/90 px-2 py-1 text-[12px] text-slate-700 shadow-sm ring-1 ring-slate-200">
+            {PLDDT_BANDS.map((b) => (
+              <span key={b.min} className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-sm" style={{ backgroundColor: b.color }} />
+                {b.label}
+              </span>
+            ))}
+          </div>
         )}
 
         {status === "loading" && (
@@ -242,7 +292,7 @@ export default function Membrane3DViewer({
         )}
         {status === "error" && (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-white text-[14px] text-rose-600">
-            Coordonnées OPM indisponibles pour {opmPdbId.toUpperCase()}.
+            Coordonnées OPM indisponibles pour {opmPdbId?.toUpperCase()}.
           </div>
         )}
       </div>
@@ -254,7 +304,7 @@ export default function Membrane3DViewer({
  * Rotation des coordonnées pour une vue de côté : la normale (z) devient
  * l’axe vertical de l’écran (y), face externe en haut.
  */
-function orientSideView(text: string): string {
+export function orientSideView(text: string): string {
   const lines = text.split("\n");
 
   let outside = 0;
@@ -312,6 +362,9 @@ function applyStyle(
 
   if (colorMode === "spectrum") {
     viewer.setStyle({ hetflag: false }, { cartoon: { color: "spectrum" } });
+  } else if (colorMode === "plddt") {
+    // pLDDT (0–100) dans la colonne B-factor
+    viewer.setStyle({ hetflag: false }, { cartoon: { colorfunc: (atom: { b: number }) => plddtColor(atom.b) } });
   } else if (colorMode === "tm") {
     viewer.setStyle({ hetflag: false }, { cartoon: { color: "#cbd5e1" } });
     for (const subunit of subunits) {
@@ -373,7 +426,7 @@ function applyStyle(
 }
 
 /** Cœur hydrophobe : bande translucide entre les deux faces (axe y après rotation). */
-function drawHydrophobicCore(viewer: any) {
+export function drawHydrophobicCore(viewer: any) {
   const dummies: { x: number; y: number; z: number }[] = viewer.selectedAtoms({ resn: "DUM" });
   if (!dummies.length) return;
   const xs = dummies.map((a) => a.x);
@@ -390,7 +443,7 @@ function drawHydrophobicCore(viewer: any) {
 }
 
 /** Vérifie à l’écran que la face externe (DUM « O ») est au-dessus de la face interne. */
-function ensureOutsideOnTop(viewer: any) {
+export function ensureOutsideOnTop(viewer: any) {
   const outer = viewer.selectedAtoms({ resn: "DUM", atom: "O" })[0];
   const inner = viewer.selectedAtoms({ resn: "DUM", atom: "N" })[0];
   if (!outer || !inner || typeof viewer.modelToScreen !== "function") return;
@@ -403,7 +456,7 @@ function ensureOutsideOnTop(viewer: any) {
   }
 }
 
-function disposeViewer(viewer: any) {
+export function disposeViewer(viewer: any) {
   if (!viewer) return;
   try {
     viewer.spin(false);

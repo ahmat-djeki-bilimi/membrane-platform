@@ -35,6 +35,7 @@ export default function TopologyDiagram({
   activeRange,
   onSelect,
   residueColor,
+  sidesSource = "les domaines topologiques UniProt",
 }: {
   regions: Region[];
   length: number;
@@ -42,6 +43,8 @@ export default function TopologyDiagram({
   onSelect?: (range: HighlightRange) => void;
   /** Couleur de chaque résidu (ex. conservation) ; sinon couleurs par type. */
   residueColor?: (position: number) => string | undefined;
+  /** Origine des côtés annotés, citée dans la légende. */
+  sidesSource?: string;
 }) {
   const [tip, setTip] = useState<Tip>(null);
   const uid = useId().replace(/:/g, "");
@@ -486,7 +489,7 @@ export default function TopologyDiagram({
         )}
         <span className="ml-auto text-slate-400">
           {topology.sidesAnnotated
-            ? "Côtés d’après les domaines topologiques UniProt"
+            ? `Côtés d’après ${sidesSource}`
             : "Côtés non annotés : orientation supposée (N-terminal cytoplasmique)"}
           {" · survolez ou cliquez un élément"}
         </span>

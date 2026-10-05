@@ -32,6 +32,8 @@ import SequencePaste from "../../components/SequencePaste";
 import SaveToProject from "../../components/SaveToProject";
 import ConservationSummary from "../../components/evolution/ConservationSummary";
 import EvolutionPanel from "../../components/evolution/EvolutionPanel";
+import PredictedStructurePanel from "../../components/prediction/PredictedStructurePanel";
+import type { KnownTopology } from "../../lib/prediction";
 import SequenceViewer from "../../components/sequence/SequenceViewer";
 import HydropathyChart from "../../components/sequence/HydropathyChart";
 import CompositionChart from "../../components/sequence/CompositionChart";
@@ -296,6 +298,14 @@ function SearchContent() {
   const segments = source === "deeptmhmm" ? deepSegments : kdSegments;
 
   const topology = useMemo(() => positiveInsideRule(sequence, segments), [sequence, segments]);
+  // Topologie DeepTMHMM transmise à la prédiction de structure ; sinon le serveur l'estime
+  const knownTopology: KnownTopology | null = useMemo(
+    () =>
+      tmhmm?.method === "DeepTMHMM" && deepSegments.length
+        ? { tm_segments: deepSegments, n_terminus: tmhmm.n_terminus, tm_source: "deeptmhmm" }
+        : null,
+    [tmhmm, deepSegments]
+  );
   const motifResult = useMemo(() => findMotif(sequence, motif), [sequence, motif]);
 
   const tmCoverage = useMemo(() => {
@@ -821,6 +831,9 @@ function SearchContent() {
 
             {mode === "accession" && uniprot && <ConservationSummary accession={uniprot.accession} />}
             {mode === "sequence" && sequence.length >= 20 && <EvolutionPanel sequence={sequence} name={entryName} />}
+            {mode === "sequence" && sequence.length >= 20 && !deepPending && (
+              <PredictedStructurePanel sequence={sequence} name={entryName} topology={knownTopology} autoStart={false} />
+            )}
 
             <div className="grid gap-4 lg:grid-cols-2">
               <Panel

@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     # Serveur MMseqs2 pour la recherche d'homologues à partir d'une séquence
     # (public ColabFold par défaut ; à remplacer par un serveur dédié en production)
     mmseqs_server_url: str = "https://api.colabfold.com"
+    # Prédiction de structure ESMFold (API publique ESM Atlas)
+    esmfold_url: str = "https://api.esmatlas.com/foldSequence/v1/pdb/"
 
     # Applique les migrations au démarrage de l'API (désactivé en production,
     # où `alembic upgrade head` est lancé une seule fois avant les serveurs)
