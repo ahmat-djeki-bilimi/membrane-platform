@@ -158,6 +158,11 @@ export type ComparisonResult = {
   /** Reste du cristal (autres chaînes, partie fusionnée, ligands), dans le même repère. */
   pdb_others: string;
   other_chains: { chain: string; molecule: string | null; residues: number; fused: boolean }[];
+  /** Très gros complexe : le reste du cristal est réduit à sa chaîne principale (N, Cα, C, O). */
+  others_simplified: boolean;
+  /** Identifiant (un caractère) de la chaîne comparée dans le fichier du reste du cristal. */
+  chain_alias: string;
+  file_format: "PDB" | "mmCIF";
   molecule: string | null;
   experimental_chain: string;
   pairs: number;

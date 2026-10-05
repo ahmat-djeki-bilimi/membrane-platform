@@ -1,6 +1,6 @@
 "use client";
 
-import { Brain, CheckCircle2, Dna, FileText, ShieldCheck, Waves } from "lucide-react";
+import { Brain, Dna, FileText, ShieldCheck, Waves } from "lucide-react";
 
 type PDBStructure = {
   pdb_id: string;
@@ -224,9 +224,6 @@ function computeGlobalLevel({
 
 function buildBiologicalInterpretation({
   tmCount,
-  membraneType,
-  selectedPdb,
-  alphafold,
 }: {
   tmCount: number;
   membraneType?: string;
@@ -254,7 +251,6 @@ function buildStructuralInterpretation({
   ramaOutliers,
   ramaFavored,
   clashscore,
-  activeSource,
 }: {
   selectedPdb: PDBStructure | null;
   confidence: number | null;
@@ -294,7 +290,6 @@ function buildCautionText({
   ramaOutliers,
   clashscore,
   selectedPdb,
-  activeSource,
 }: {
   tmCount: number;
   ramaOutliers: number | null;
@@ -330,7 +325,6 @@ function buildCautionText({
 function buildReportConclusion({
   accession,
   tmCount,
-  membraneType,
   selectedPdb,
   confidence,
   ramaOutliers,

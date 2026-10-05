@@ -5,6 +5,7 @@ import { Download, RotateCw } from "lucide-react";
 import { disposeViewer, drawHydrophobicCore, ensureOutsideOnTop, orientSideView } from "@/components/Membrane3DViewer";
 import { DEVIATION_BANDS, PLDDT_BANDS, deviationColor, plddtColor, type ComparisonResult } from "@/lib/prediction";
 import { downloadText } from "@/lib/sequence";
+import type { GLViewer } from "3dmol";
 
 type Range = { start: number; end: number; label?: string; color?: string };
 type ColorMode = "pair" | "deviation" | "plddt";
@@ -31,7 +32,8 @@ type StyleOptions = {
   showLigands: boolean;
   showMembrane: boolean;
   wholeCrystal: boolean;
-  experimentalChain: string;
+  /** Chaîne comparée dans le reste du cristal, si une protéine y est fusionnée. */
+  fusedChain: string | null;
   activeRange: Range | null;
   deviation: Map<number, number>;
 };
@@ -56,7 +58,7 @@ export default function SuperpositionViewer({
 }) {
   const leftRef = useRef<HTMLDivElement | null>(null);
   const rightRef = useRef<HTMLDivElement | null>(null);
-  const viewersRef = useRef<any[]>([]);
+  const viewersRef = useRef<GLViewer[]>([]);
   const [ready, setReady] = useState(false);
   const [layout, setLayout] = useState<Layout>("overlay");
   const [colorMode, setColorMode] = useState<ColorMode>("pair");
@@ -88,7 +90,7 @@ export default function SuperpositionViewer({
       const others = comparison.pdb_others ? orientSideView(comparison.pdb_others) : null;
       viewersRef.current = hosts.map((host) => {
         host!.innerHTML = "";
-        const viewer = $3Dmol.createViewer(host!, { backgroundColor: "white", orthographic: true } as any);
+        const viewer = $3Dmol.createViewer(host!, { backgroundColor: "white", orthographic: true } as Parameters<typeof $3Dmol.createViewer>[1]);
         viewer.addModel(model, "pdb");
         viewer.addModel(experimental, "pdb");
         if (others) viewer.addModel(others, "pdb");
@@ -124,7 +126,7 @@ export default function SuperpositionViewer({
         showLigands,
         showMembrane,
         wholeCrystal: showWhole,
-        experimentalChain: comparison.chain,
+        fusedChain: comparison.other_chains.some((c) => c.fused) ? comparison.chain_alias || comparison.chain : null,
         activeRange: activeRange ?? null,
         deviation,
       });
@@ -322,7 +324,11 @@ function Legend({
           ...(layout === "overlay" ? [{ color: EXPERIMENTAL_COLOR, label: `Cristal (tube fin)` }] : []),
         ];
   if (fused) rows.push({ color: FUSED_COLOR, label: `Chaîne ${fused.chain} hors UniProt (fusion)` });
-  if (otherChains.length) rows.push({ color: OTHER_CHAINS_COLOR, label: `Autres chaînes : ${otherChains.join(", ")}` });
+  if (otherChains.length)
+    rows.push({
+      color: OTHER_CHAINS_COLOR,
+      label: otherChains.length <= 6 ? `Autres chaînes : ${otherChains.join(", ")}` : `${otherChains.length} autres chaînes`,
+    });
   const title = colorMode === "pair" ? null : colorMode === "deviation" ? "Modèle : écart au cristal" : "Modèle : pLDDT";
   return (
     <div className="pointer-events-none absolute bottom-3 right-3 z-10 space-y-0.5 rounded bg-white/90 px-2 py-1 text-[12px] text-slate-700 shadow-sm ring-1 ring-slate-200">
@@ -337,7 +343,7 @@ function Legend({
   );
 }
 
-function applyStyle(viewer: any, o: StyleOptions) {
+function applyStyle(viewer: GLViewer, o: StyleOptions) {
   viewer.setStyle({}, {});
   viewer.removeAllShapes();
   const showModel = o.which === "model" || (o.which === "both" && o.showModel);
@@ -366,7 +372,7 @@ function applyStyle(viewer: any, o: StyleOptions) {
   // Reste du cristal : autres chaînes en gris, partie fusionnée de la chaîne comparée en rose
   if (showExperimental && o.wholeCrystal) {
     viewer.setStyle({ model: 2, hetflag: false }, { cartoon: { color: OTHER_CHAINS_COLOR } });
-    viewer.setStyle({ model: 2, hetflag: false, chain: o.experimentalChain }, { cartoon: { color: FUSED_COLOR } });
+    if (o.fusedChain) viewer.setStyle({ model: 2, hetflag: false, chain: o.fusedChain }, { cartoon: { color: FUSED_COLOR } });
     if (o.showLigands) viewer.setStyle({ model: 2, hetflag: true }, { stick: { radius: 0.18, colorscheme: "greenCarbon" } });
   }
   if (o.showMembrane) {
@@ -375,7 +381,7 @@ function applyStyle(viewer: any, o: StyleOptions) {
     drawHydrophobicCore(viewer);
   }
   if (o.activeRange) {
-    const resi = `${o.activeRange.start}-${o.activeRange.end}`;
+    const resi: `${number}-${number}` = `${o.activeRange.start}-${o.activeRange.end}`;
     if (showModel) viewer.addStyle({ model: 0, resi, hetflag: false }, { stick: { color: MODEL_COLOR, radius: 0.22 } });
     if (showExperimental) viewer.addStyle({ model: 1, resi, hetflag: false }, { stick: { color: EXPERIMENTAL_COLOR, radius: 0.18 } });
   }

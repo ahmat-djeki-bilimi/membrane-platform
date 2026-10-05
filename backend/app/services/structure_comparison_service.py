@@ -25,6 +25,7 @@ from app.services import sifts_service, uniprot_service
 from app.services.active_site_service import IMPORTANT_LIGANDS, _is_ligand_candidate
 from app.services.alphafold_service import get_alphafold
 from app.services.membrane_embedding_service import THREE_TO_ONE, helix_axis
+from app.services.mmcif import parse_mmcif
 from app.services.structure_prediction_service import place_model
 
 RCSB_DOWNLOAD = "https://files.rcsb.org/download"
@@ -36,7 +37,10 @@ CONTACT = 4.5  # Å : résidu du modèle au contact d'un ligand expérimental
 TILT_DIFFERENCE = 10.0  # degrés
 CONFIDENT = 70.0  # pLDDT
 MIN_IDENTITY = 0.9  # correspondance déduite de la séquence
-EXPERIMENTAL_CHAIN = "E"  # chaîne de la structure expérimentale dans le fichier superposé
+EXPERIMENTAL_CHAIN = "E"
+# Au-delà, le reste du cristal est réduit à sa chaîne principale (gros complexes de cryo-ME)
+MAX_OTHER_ATOMS = 40000
+BACKBONE = {"N", "CA", "C", "O"}  # chaîne de la structure expérimentale dans le fichier superposé
 
 
 class ComparisonError(Exception):
@@ -54,6 +58,22 @@ def fetch_pdb_text(pdb_id: str) -> str | None:
         return None
     response.raise_for_status()
     return response.text
+
+
+@cached("rcsb:cif", ttl=30 * 24 * 3600)
+def fetch_cif_text(pdb_id: str) -> str | None:
+    response = http.get(f"{RCSB_DOWNLOAD}/{pdb_id.upper()}.cif", timeout=120)
+    if response.status_code == 404:
+        return None
+    response.raise_for_status()
+    return response.text
+
+
+def read_structure(text: str) -> tuple[list[dict], dict[str, str]]:
+    """Atomes et noms des molécules d'un fichier PDB ou mmCIF (format reconnu au contenu)."""
+    if text.lstrip().startswith("data_"):
+        return parse_mmcif(text)
+    return parse_atoms(text), molecule_names(text)
 
 
 def parse_atoms(pdb: str) -> list[dict]:
@@ -266,7 +286,7 @@ def molecule_names(pdb: str) -> dict[str, str]:
     return names
 
 
-def _write_other_chains(atoms, chain, author_to_unp, rotation, translation, names) -> tuple[str, list[dict]]:
+def _write_other_chains(atoms, chain, author_to_unp, rotation, translation, names) -> tuple[str, list[dict], bool]:
     """
     Reste du cristal, déplacé avec la même superposition : autres chaînes
     (protéines et ligands) et, dans la chaîne comparée, les résidus hors de la
@@ -275,8 +295,12 @@ def _write_other_chains(atoms, chain, author_to_unp, rotation, translation, name
     lines, residues = [], {}
     fused = 0
     fmt = lambda v: f"{v:8.3f}"[-8:]  # noqa: E731
+    others = sum(1 for a in atoms if a["chain"] != chain and a["record"] == "ATOM")
+    simplified = others > MAX_OTHER_ATOMS
     for a in atoms:
         if a["resn"] == "DUM":
+            continue
+        if simplified and a["chain"] != chain and (a["record"] != "ATOM" or a["name"] not in BACKBONE):
             continue
         if a["chain"] == chain:
             if a["record"] != "ATOM" or (a["resi"] in author_to_unp and not a["icode"]):
@@ -294,11 +318,11 @@ def _write_other_chains(atoms, chain, author_to_unp, rotation, translation, name
         if a["record"] == "ATOM" and a["name"] == "CA":
             residues[a["chain"]] = residues.get(a["chain"], 0) + 1
     if not lines:
-        return "", []
+        return "", [], False
     chains = [{"chain": c, "molecule": names.get(c), "residues": n, "fused": False} for c, n in sorted(residues.items())]
     if fused:
         chains.insert(0, {"chain": chain, "molecule": "Partie hors UniProt (protéine fusionnée)", "residues": fused, "fused": True})
-    return "\n".join(lines + ["END"]) + "\n", chains
+    return "\n".join(lines + ["END"]) + "\n", chains, simplified
 
 
 def _ligand_sites(ligand_atoms: list[dict], model_atoms: list[dict], plddt: dict[int, float]) -> list[dict]:
@@ -334,7 +358,13 @@ def _ligand_sites(ligand_atoms: list[dict], model_atoms: list[dict], plddt: dict
     return sites
 
 
-def compare_structures(prediction: dict, experimental_pdb: str, pdb_id: str, mapping: dict, chain: str | None = None) -> dict:
+def compare_structures(
+    prediction: dict,
+    experimental: str | tuple[list[dict], dict[str, str]],
+    pdb_id: str,
+    mapping: dict,
+    chain: str | None = None,
+) -> dict:
     """Superpose la structure expérimentale sur le modèle (repère de la membrane) et mesure les écarts."""
     model_atoms_all = parse_atoms(prediction["pdb"])
     model_atoms = [a for a in model_atoms_all if a["record"] == "ATOM"]
@@ -342,7 +372,8 @@ def compare_structures(prediction: dict, experimental_pdb: str, pdb_id: str, map
     model_aa = {r["number"]: r["aa"] for r in prediction["residues"]}
     plddt = {r["number"]: r["plddt"] for r in prediction["residues"]}
 
-    atoms = parse_atoms(experimental_pdb)
+    # Texte PDB ou mmCIF, ou atomes et noms déjà lus
+    atoms, names = read_structure(experimental) if isinstance(experimental, str) else experimental
     segments = mapping.get("segments", [])
     if chain is None:
         chain = choose_chain(atoms, segments, set(model_ca))
@@ -441,8 +472,9 @@ def compare_structures(prediction: dict, experimental_pdb: str, pdb_id: str, map
     correlation = spearman(plddt_values, distances)
 
     pdb_text, ligand_atoms = _write_experimental(atoms, chain, author_to_unp, rotation, translation)
-    names = molecule_names(experimental_pdb)
-    others_text, other_chains = _write_other_chains(atoms, chain, author_to_unp, rotation, translation, names)
+    others_text, other_chains, simplified = _write_other_chains(atoms, chain, author_to_unp, rotation, translation, names)
+    # Identifiant de la chaîne comparée dans le fichier du reste du cristal (un caractère)
+    chain_alias = next((a["line"][21] for a in atoms if a["chain"] == chain), chain[:1])
     ligands = _ligand_sites(ligand_atoms, model_atoms, plddt)
 
     window = prediction.get("window") or {"start": numbers[0], "end": numbers[-1]}
@@ -455,6 +487,8 @@ def compare_structures(prediction: dict, experimental_pdb: str, pdb_id: str, map
         # Reste du cristal (autres chaînes et leurs ligands), dans le même repère
         "pdb_others": others_text,
         "other_chains": other_chains,
+        "others_simplified": simplified,
+        "chain_alias": chain_alias,
         "molecule": names.get(chain),
         "experimental_chain": EXPERIMENTAL_CHAIN,
         "pairs": len(numbers),
@@ -622,19 +656,24 @@ def interpret(c: dict) -> list[dict]:
 def _compare(prediction: dict, accession: str, pdb_id: str, chain: str | None) -> dict:
     """Comparaison d'un modèle placé dans la membrane avec une structure PDB (erreur dans « error »)."""
     try:
-        text = fetch_pdb_text(pdb_id)
+        text, file_format = fetch_pdb_text(pdb_id), "PDB"
         if text is None:
-            return {"error": f"Fichier PDB indisponible pour {pdb_id.upper()} (structure disponible seulement en mmCIF)."}
+            # Très grandes structures : distribuées seulement en mmCIF
+            text, file_format = fetch_cif_text(pdb_id), "mmCIF"
+        if text is None:
+            return {"error": f"Coordonnées introuvables pour {pdb_id.upper()}."}
+        structure = read_structure(text)
         mapping = sifts_service.get_mapping(pdb_id, accession)
         source = "SIFTS"
         if not mapping.get("available"):
             sequence = uniprot_service.fetch_entry(accession).get("sequence", {}).get("value", "")
-            mapping = {"segments": infer_segments(parse_atoms(text), sequence)}
+            mapping = {"segments": infer_segments(structure[0], sequence)}
             source = "séquence"
             if not mapping["segments"]:
                 return {"error": f"{pdb_id.upper()} ne contient pas de chaîne correspondant à {accession}."}
-        result = compare_structures(prediction, text, pdb_id, mapping, chain)
+        result = compare_structures(prediction, structure, pdb_id, mapping, chain)
         result["mapping_source"] = source
+        result["file_format"] = file_format
         if source != "SIFTS":
             result["method"] = result["method"].replace(
                 "Correspondance SIFTS", "Numérotation déduite de la séquence (SIFTS incomplet)"
@@ -644,7 +683,7 @@ def _compare(prediction: dict, accession: str, pdb_id: str, chain: str | None) -
         return {"error": str(e)}
 
 
-@cached("comparison:v6", ttl=30 * 24 * 3600, store_if=is_successful)
+@cached("comparison:v8", ttl=30 * 24 * 3600, store_if=is_successful)
 def compare_prediction_job(job_id: str, accession: str, pdb_id: str, chain: str | None = None) -> dict:
     """Comparaison d'une prédiction ESMFold terminée, mise en cache (un résultat de tâche ne change pas)."""
     job = jobs.get(job_id)
@@ -684,7 +723,7 @@ def alphafold_in_membrane(accession: str, topology: dict) -> dict:
     return placed
 
 
-@cached("comparison:alphafold:v4", ttl=30 * 24 * 3600, store_if=is_successful)
+@cached("comparison:alphafold:v6", ttl=30 * 24 * 3600, store_if=is_successful)
 def compare_alphafold(accession: str, pdb_id: str, topology: dict, chain: str | None = None) -> dict:
     """Modèle AlphaFold placé dans la membrane et sa superposition avec une structure PDB."""
     placed = alphafold_in_membrane(accession, topology)

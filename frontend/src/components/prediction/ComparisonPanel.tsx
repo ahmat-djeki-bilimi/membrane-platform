@@ -260,19 +260,32 @@ export default function ComparisonPanel({
 const sentenceCase = (text: string) => text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
 
 /** Chaînes du cristal : celle comparée au modèle, et le reste (partenaires, protéine fusionnée). */
+const COLLAPSED_CHAINS = 6;
+
 function CrystalContents({ comparison }: { comparison: ComparisonResult }) {
+  const [showAll, setShowAll] = useState(false);
   if (!comparison.other_chains.length) return null;
+  const chains = showAll ? comparison.other_chains : comparison.other_chains.slice(0, COLLAPSED_CHAINS);
+  const hidden = comparison.other_chains.length - chains.length;
   return (
     <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] text-slate-700">
-      <p className="mb-1 font-semibold text-slate-900">Contenu du cristal {comparison.pdb_id}</p>
-      <ul className="space-y-0.5">
+      <p className="mb-1 font-semibold text-slate-900">
+        Contenu du cristal {comparison.pdb_id} · {comparison.other_chains.length + 1} chaînes
+        {comparison.file_format === "mmCIF" && <span className="ml-1 font-normal text-slate-500">(fichier mmCIF)</span>}
+      </p>
+      {comparison.others_simplified && (
+        <p className="mb-1 text-slate-500">
+          Grand complexe : les autres chaînes sont montrées par leur chaîne principale seule, pour garder la vue fluide.
+        </p>
+      )}
+      <ul className="max-h-[260px] space-y-0.5 overflow-auto">
         <li className="flex items-center gap-2">
           <span className="h-2.5 w-2.5 shrink-0 rounded-sm bg-[#c026d3]" />
           <span className="font-mono font-semibold">{comparison.chain}</span>
           <span>{comparison.molecule ? sentenceCase(comparison.molecule) : "Chaîne comparée"}</span>
           <span className="text-slate-400">· comparée au modèle</span>
         </li>
-        {comparison.other_chains.map((o) => (
+        {chains.map((o) => (
           <li key={`${o.chain}-${o.fused}`} className="flex items-center gap-2">
             <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: o.fused ? "#f0abfc" : "#94a3b8" }} />
             <span className="font-mono font-semibold">{o.chain}</span>
@@ -281,6 +294,11 @@ function CrystalContents({ comparison }: { comparison: ComparisonResult }) {
           </li>
         ))}
       </ul>
+      {(hidden > 0 || showAll) && comparison.other_chains.length > COLLAPSED_CHAINS && (
+        <button onClick={() => setShowAll((v) => !v)} className="mt-1 font-semibold text-violet-700 hover:underline">
+          {showAll ? "Afficher moins" : `Afficher les ${hidden} autres chaînes`}
+        </button>
+      )}
     </div>
   );
 }

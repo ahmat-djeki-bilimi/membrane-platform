@@ -339,8 +339,8 @@ export default function StructurePage() {
     setActiveRange(null);
   }, [source, selectedPdb?.pdb_id]);
 
-  const structures = pdbData?.structures ?? [];
-  const tmSegments = membraneData?.tm_segments ?? [];
+  const structures = useMemo(() => pdbData?.structures ?? [], [pdbData]);
+  const tmSegments = useMemo(() => membraneData?.tm_segments ?? [], [membraneData]);
   const proteinLength = uniprot?.length || pdbData?.uniprot_length || alphafold?.sequence_length || 0;
   const proteinName = uniprot?.protein_name || alphafold?.protein_name || accession;
   const organism = uniprot?.organism || alphafold?.organism;
@@ -1022,13 +1022,12 @@ function PlddtDonut({
   const stroke = 20;
   const c = 2 * Math.PI * r;
   const gap = 2;
-  let offset = 0;
-  const arcs = PLDDT_BANDS.map((b) => {
-    const f = fractions[b.key] ?? 0;
+  const shares = PLDDT_BANDS.map((b) => fractions[b.key] ?? 0);
+  const arcs = PLDDT_BANDS.map((b, i) => {
+    const f = shares[i];
     const len = Math.max(f * c - gap, 0);
-    const arc = { ...b, f, dash: `${len} ${c - len}`, offset: -offset };
-    offset += f * c;
-    return arc;
+    const before = shares.slice(0, i).reduce((sum, v) => sum + v, 0);
+    return { ...b, f, dash: `${len} ${c - len}`, offset: -before * c };
   });
 
   return (
