@@ -13,3 +13,6 @@ huey==3.4.0
 
 # Prédiction de topologie (DeepTMHMM via BioLib)
 pybiolib==1.4.551
+
+# Calcul numérique (arbres phylogénétiques)
+numpy==2.3.4

@@ -21,6 +21,7 @@ from collections import Counter, defaultdict
 from app import http
 from app.services.alignment import align_to_query
 from app.services.homology_service import fetch_uniref_organisms, run_mmseqs
+from app.services.phylogeny_service import build_tree
 from app.services.uniprot_service import domain_features, fetch_entry, tm_segments
 
 UNIREF = "https://rest.uniprot.org/uniref"
@@ -450,6 +451,15 @@ def _mmseqs_alignment(query: str) -> tuple[list[str], list[dict], dict]:
 # Points d'entrée
 # ---------------------------------------------------------------------------
 
+def _add_tree(result: dict, query: str, query_info: dict) -> None:
+    """Arbre phylogénétique des séquences de l'alignement affiché."""
+    try:
+        result["tree"] = build_tree(query, query_info, result["msa"], result["homologs"])
+    except Exception as error:  # l'arbre ne doit pas faire échouer la conservation
+        result["tree"] = None
+        result["warnings"].append(f"Arbre phylogénétique indisponible : {error}")
+
+
 def compute_conservation(accession: str, source: str = "uniref50") -> dict:
     """Conservation d'une entrée UniProt (homologues UniRef50 ou MMseqs2)."""
     accession = accession.upper().strip()
@@ -464,6 +474,8 @@ def compute_conservation(accession: str, source: str = "uniref50") -> dict:
         rows, homologs, meta = _uniref50_alignment(accession, query)
 
     result = analyze_alignment(query, rows, homologs, membrane_regions(entry, len(query)), tm_segments(entry))
+    organism = entry.get("organism") or {}
+    _add_tree(result, query, {"id": accession, "organism": organism.get("scientificName"), "taxon_id": organism.get("taxonId")})
     return {"accession": accession, **meta, **result}
 
 
@@ -480,6 +492,7 @@ def compute_sequence_conservation(sequence: str, name: str = "query") -> dict:
     segments = [{"start": s["start"], "end": s["end"], "label": s["label"]} for s in estimate_tm_segments(query)]
     regions = regions_from_segments(segments, len(query), estimated=True)
     result = analyze_alignment(query, rows, homologs, regions, segments)
+    _add_tree(result, query, {"id": name or "query", "organism": None, "taxon_id": None})
     if segments:
         result["warnings"].append(
             "Segments transmembranaires estimés par hydropathie (Kyte-Doolittle) : à confirmer par DeepTMHMM."

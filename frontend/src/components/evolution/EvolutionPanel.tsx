@@ -6,6 +6,8 @@ import { AlertTriangle, ArrowRight, Download, ExternalLink, GitBranch, Loader2 }
 import Link from "next/link";
 import ConservationProfile from "./ConservationProfile";
 import MsaViewer from "./MsaViewer";
+import { groupColors, layoutTree } from "@/lib/phylo";
+import { SEQUENCE_STORAGE_PREFIX } from "@/components/SearchForm";
 import TopologyDiagram from "@/components/protein/TopologyDiagram";
 import { API_BASE } from "@/lib/api";
 import {
@@ -18,7 +20,7 @@ import {
   type ConservationSource,
 } from "@/lib/conservation";
 import { mapRanges, type ResidueMapping } from "@/lib/mapping";
-import { downloadText, toFasta } from "@/lib/sequence";
+import { downloadText, hashSequence, toFasta } from "@/lib/sequence";
 import type { Region } from "@/lib/topology";
 
 const Structure3DViewer = dynamic(() => import("@/components/Structure3DViewer"), { ssr: false });
@@ -53,6 +55,7 @@ export default function EvolutionPanel({
   const fileBase = accession ?? (name.replace(/[^\w.-]+/g, "_") || "sequence");
   const [focusRange, setFocusRange] = useState<{ start: number; end: number; label: string } | null>(null);
   const [regions, setRegions] = useState<Region[]>([]);
+  const [selectedSpecies, setSelectedSpecies] = useState<string | null>(null);
   const selected = focusRange && focusRange.start === focusRange.end ? focusRange.start : null;
   const setSelected = (position: number | null) =>
     setFocusRange(position ? { start: position, end: position, label: `Résidu ${position}` } : null);
@@ -92,6 +95,13 @@ export default function EvolutionPanel({
     const range = { ...focusRange, color: "#7c3aed" };
     return model === "pdb" ? mapRanges([range], mapping) : [range];
   }, [focusRange, model, mapping]);
+
+  // Ordre des espèces dans l'arbre, repris par l'alignement
+  const treeOrder = useMemo(() => {
+    const tree = result?.tree;
+    if (!tree) return undefined;
+    return layoutTree(tree.root, "cladogram").order.map((i) => tree.leaves[i]?.id).filter((id): id is string => !!id);
+  }, [result]);
 
   if (status !== "succeeded" || !result) {
     return (
@@ -296,6 +306,31 @@ export default function EvolutionPanel({
         </section>
       </div>
 
+      {result.tree && (
+        <TreeLink
+          href={
+            accession
+              ? `/phylogenie?accession=${accession}&source=${source}`
+              : `/phylogenie?seq=${hashSequence(result.query_sequence)}`
+          }
+          onOpen={() => {
+            if (accession) return;
+            // La page de l'arbre relit la séquence dans la session du navigateur
+            try {
+              sessionStorage.setItem(
+                SEQUENCE_STORAGE_PREFIX + hashSequence(result.query_sequence),
+                JSON.stringify({ header: name, sequence: result.query_sequence, warnings: [] })
+              );
+            } catch {
+              // Sans stockage de session, la page le signalera
+            }
+          }}
+          leafCount={result.tree.leaf_count}
+          groups={result.tree.groups}
+          rankLabel={result.tree.group_rank_label}
+        />
+      )}
+
       <section className="rounded-lg border border-slate-200 bg-white p-4">
         <h3 className="mb-2 text-[16px] font-semibold text-slate-900">
           Alignement multiple ({result.msa.length} séquences affichées)
@@ -307,6 +342,9 @@ export default function EvolutionPanel({
           selected={selected}
           onSelect={setSelected}
           regions={result.summary.regions}
+          treeOrder={treeOrder}
+          highlightId={selectedSpecies}
+          onSelectRow={setSelectedSpecies}
         />
       </section>
 
@@ -507,5 +545,51 @@ function SourceSwitch({ source, onChange }: { source: ConservationSource; onChan
         </button>
       ))}
     </div>
+  );
+}
+
+function TreeLink({
+  href,
+  onOpen,
+  leafCount,
+  groups,
+  rankLabel,
+}: {
+  href: string;
+  onOpen: () => void;
+  leafCount: number;
+  groups: { name: string; count: number }[];
+  rankLabel: string | null;
+}) {
+  const colors = groupColors(groups);
+  return (
+    <Link
+      href={href}
+      onClick={onOpen}
+      className="group flex flex-wrap items-center justify-between gap-3 rounded-lg border border-violet-200 bg-gradient-to-r from-violet-50 to-white px-4 py-3 transition hover:border-violet-400 hover:shadow-sm"
+    >
+      <div className="flex items-center gap-3">
+        <span className="rounded-md bg-violet-600 p-2 text-white">
+          <GitBranch size={18} />
+        </span>
+        <div>
+          <p className="text-[16px] font-semibold text-slate-900">Arbre phylogénétique · {leafCount} séquences</p>
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[14px] text-slate-600">
+            {rankLabel && <span>{groups.length} {rankLabel.toLowerCase()}{groups.length > 1 ? "s" : ""} :</span>}
+            {groups.slice(0, 5).map((g) => (
+              <span key={g.name} className="flex items-center gap-1">
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: colors.get(g.name) }} />
+                <span className="italic">{g.name}</span>
+              </span>
+            ))}
+            {groups.length > 5 && <span>…</span>}
+          </p>
+        </div>
+      </div>
+      <span className="inline-flex items-center gap-1 text-[14px] font-semibold text-violet-700 group-hover:underline">
+        Ouvrir l’arbre
+        <ArrowRight size={15} />
+      </span>
+    </Link>
   );
 }

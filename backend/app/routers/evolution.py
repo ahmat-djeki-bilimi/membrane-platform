@@ -12,7 +12,7 @@ from app.services.homology_service import find_identical_entry
 router = APIRouter(prefix="/api", tags=["Évolution"])
 
 # À incrémenter quand la méthode change : les anciens résultats sont recalculés
-CONSERVATION_METHOD_VERSION = 3
+CONSERVATION_METHOD_VERSION = 4
 MAX_SEQUENCE_LENGTH = 5000
 
 
