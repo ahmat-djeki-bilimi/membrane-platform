@@ -1,15 +1,15 @@
 "use client";
 
-import { Dna, Eye, Layers3, Map, Search, ShieldCheck } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Dna, Eye, Loader2, Search } from "lucide-react";
+import { API_BASE } from "@/lib/api";
+import TopologyDiagram from "@/components/protein/TopologyDiagram";
+import DomainArchitecture from "@/components/protein/DomainArchitecture";
 
 type AlphaFoldData = {
   available: boolean;
-  confidence?: number;
-  confidence_avg?: number;
   sequence?: string;
   sequence_length?: number;
-  protein_name?: string;
-  organism?: string;
 };
 
 type HighlightRange = {
@@ -19,10 +19,19 @@ type HighlightRange = {
   color?: string;
 };
 
+type DomainType =
+  | "domain"
+  | "repeat"
+  | "topological"
+  | "transmembrane"
+  | "intramembrane"
+  | "signal"
+  | "region"
+  | "motif";
+
 type DomainRegion = HighlightRange & {
-  type: "domain" | "terminal" | "flexible" | "linker" | "motif";
-  confidence: "high" | "medium" | "low";
-  description: string;
+  type: DomainType;
+  feature_type?: string;
 };
 
 type SequenceMotif = HighlightRange & {
@@ -31,259 +40,223 @@ type SequenceMotif = HighlightRange & {
   description: string;
 };
 
+// Couleur et libellé par type d'annotation UniProt
+const DOMAIN_STYLES: Record<DomainType, { color: string; label: string }> = {
+  domain: { color: "#2563eb", label: "Domaine" },
+  repeat: { color: "#0891b2", label: "Répétition" },
+  transmembrane: { color: "#d97706", label: "Transmembranaire" },
+  intramembrane: { color: "#b45309", label: "Intramembranaire" },
+  topological: { color: "#64748b", label: "Domaine topologique" },
+  signal: { color: "#db2777", label: "Peptide signal" },
+  region: { color: "#7c3aed", label: "Région" },
+  motif: { color: "#059669", label: "Motif" },
+};
+
 export default function StructuralDomains({
+  accession,
   alphafold,
-  activeSource,
   activeRange,
   onFocusRange,
   onClearFocus,
 }: {
+  accession: string;
   alphafold: AlphaFoldData | null;
-  activeSource: "pdb" | "alphafold" | "ai";
+  activeSource?: "pdb" | "alphafold";
   activeRange: HighlightRange | null;
   onFocusRange: (range: HighlightRange) => void;
   onClearFocus: () => void;
 }) {
+  const [domains, setDomains] = useState<DomainRegion[]>([]);
+  const [domainLength, setDomainLength] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!accession) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    fetch(`${API_BASE}/api/domains/${accession}`)
+      .then((res) => res.json())
+      .then((json) => {
+        if (cancelled) return;
+        if (json.error) setError(json.error);
+        setDomainLength(json.sequence_length || 0);
+        setDomains(
+          (json.domains || []).map((d: DomainRegion) => ({
+            ...d,
+            color: DOMAIN_STYLES[d.type]?.color ?? "#64748b",
+          }))
+        );
+      })
+      .catch(() => !cancelled && setError("Impossible de joindre le serveur d’analyse."))
+      .finally(() => !cancelled && setLoading(false));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [accession]);
+
   const sequence = (alphafold?.sequence || "").toUpperCase();
-  const length = alphafold?.sequence_length || sequence.length || 0;
-  const confidence = alphafold?.confidence ?? alphafold?.confidence_avg ?? null;
-
-  const regions = buildDomainRegions(length, confidence);
-  const motifs = scanSequenceMotifs(sequence).slice(0, 18);
-
-  if (!alphafold?.available || !length) {
-    return (
-      <section className="rounded border border-slate-200 bg-white p-3 shadow-sm">
-        <SectionTitle />
-        <div className="rounded border border-amber-100 bg-amber-50 p-3 text-[12px] leading-5 text-amber-900">
-          Les domaines et motifs seront détectés dès qu’un modèle AlphaFold avec
-          séquence sera disponible. Cette étape utilise la séquence réelle,
-          recherche des motifs conservés et relie les régions au viewer 3D.
-        </div>
-      </section>
-    );
-  }
+  const length = domainLength || alphafold?.sequence_length || sequence.length || 0;
+  const motifs = scanSequenceMotifs(sequence).slice(0, 24);
+  const isActive = (r: HighlightRange) =>
+    activeRange?.start === r.start && activeRange?.end === r.end;
 
   return (
-    <section className="rounded border border-slate-200 bg-white p-3 shadow-sm">
-      <div className="mb-3 flex items-center justify-between">
+    <section className="rounded-lg border border-slate-200 bg-white">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
         <SectionTitle />
         <div className="flex items-center gap-2">
           {activeRange && (
             <button
               onClick={onClearFocus}
-              className="rounded border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-600 hover:bg-white"
+              className="rounded-md border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-600 hover:bg-slate-50"
             >
-              Réinitialiser
+              Réinitialiser la sélection
             </button>
           )}
-          <span className="rounded border border-blue-100 bg-blue-50 px-3 py-1 text-[11px] font-semibold text-blue-800">
-            {regions.length} régions · {motifs.length} motifs
+          <span className="rounded bg-blue-50 px-2.5 py-1 text-[13px] font-semibold text-blue-800">
+            {domains.length} annotation{domains.length > 1 ? "s" : ""} · {motifs.length} motif
+            {motifs.length > 1 ? "s" : ""}
           </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-12 gap-3">
-        <div className="col-span-8 space-y-2">
-          <div className="rounded border border-slate-200 bg-slate-50 p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-[12px] font-bold text-slate-800">
-                Carte linéaire domaines + motifs
-              </p>
-              <span className="text-[11px] text-slate-500">
-                Longueur : {length} aa
-              </span>
-            </div>
-
-            <div className="relative h-16 rounded border border-slate-200 bg-white px-2 py-3">
-              <div className="absolute left-2 right-2 top-[45%] h-1 -translate-y-1/2 rounded bg-slate-200" />
-              <div className="absolute left-2 right-2 top-[73%] h-1 -translate-y-1/2 rounded bg-slate-100" />
-
-              {regions.map((region) => {
-                const left = ((region.start - 1) / length) * 100;
-                const width =
-                  ((region.end - region.start + 1) / length) * 100;
-
-                return (
-                  <button
-                    key={`${region.start}-${region.end}-${region.label}`}
-                    onClick={() => onFocusRange(region)}
-                    className={`absolute top-[45%] h-6 -translate-y-1/2 rounded shadow-sm transition hover:scale-y-110 ${
-                      activeRange?.start === region.start &&
-                      activeRange?.end === region.end
-                        ? "ring-2 ring-red-500"
-                        : "ring-1 ring-white"
-                    }`}
-                    style={{
-                      left: `${left}%`,
-                      width: `${Math.max(width, 3)}%`,
-                      backgroundColor: region.color || "#2563eb",
-                    }}
-                    title={`${region.label}: ${region.start}-${region.end}`}
-                  />
-                );
-              })}
-
-              {motifs.slice(0, 12).map((motif, index) => {
-                const left = ((motif.start - 1) / length) * 100;
-                const width =
-                  ((motif.end - motif.start + 1) / length) * 100;
-
-                return (
-                  <button
-                    key={`${motif.start}-${motif.end}-${motif.label}-${index}`}
-                    onClick={() => onFocusRange(motif)}
-                    className={`absolute top-[73%] h-4 -translate-y-1/2 rounded transition hover:scale-y-125 ${
-                      activeRange?.start === motif.start &&
-                      activeRange?.end === motif.end
-                        ? "ring-2 ring-red-500"
-                        : "ring-1 ring-white"
-                    }`}
-                    style={{
-                      left: `${left}%`,
-                      width: `${Math.max(width, 1.5)}%`,
-                      backgroundColor: motif.color || "#ef4444",
-                    }}
-                    title={`${motif.label}: ${motif.start}-${motif.end}`}
-                  />
-                );
-              })}
-            </div>
-
-            <div className="mt-2 flex justify-between text-[10px] text-slate-500">
-              <span>1</span>
-              <span>{Math.round(length / 2)}</span>
-              <span>{length}</span>
-            </div>
+      <div className="space-y-4 p-4">
+        {loading ? (
+          <div className="flex items-center gap-2 py-6 text-[14px] text-slate-500">
+            <Loader2 size={15} className="animate-spin text-blue-600" />
+            Chargement des annotations UniProt…
           </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            {regions.map((region) => (
-              <button
-                key={`${region.start}-${region.end}`}
-                onClick={() => onFocusRange(region)}
-                className={`rounded border p-2 text-left transition ${
-                  activeRange?.start === region.start &&
-                  activeRange?.end === region.end
-                    ? "border-red-300 bg-red-50"
-                    : "border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50"
-                }`}
-              >
-                <div className="mb-1 flex items-center justify-between">
-                  <p className="text-[12px] font-bold text-slate-900">
-                    {region.label}
-                  </p>
-                  <span
-                    className="rounded px-2 py-0.5 text-[10px] font-semibold text-white"
-                    style={{ backgroundColor: region.color || "#2563eb" }}
-                  >
-                    {region.start}-{region.end}
-                  </span>
-                </div>
-
-                <p className="text-[10px] leading-4 text-slate-600">
-                  {region.description}
+        ) : error ? (
+          <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-[14px] text-amber-900">
+            {error}
+          </p>
+        ) : domains.length === 0 ? (
+          <p className="rounded-md border border-slate-200 bg-slate-50 p-3 text-[14px] text-slate-600">
+            Aucun domaine ni région n’est annoté dans UniProtKB pour cette entrée.
+          </p>
+        ) : (
+          <>
+            {domains.some((d) => d.type === "transmembrane" || d.type === "intramembrane") && (
+              <div className="rounded-md border border-slate-200 p-3">
+                <h3 className="mb-0.5 text-[15px] font-semibold text-slate-900">Topologie membranaire</h3>
+                <p className="mb-2 text-[13px] text-slate-500">
+                  Passage de la chaîne à travers la bicouche lipidique d’après les annotations
+                  UniProt (segments transmembranaires, régions intramembranaires et domaines
+                  topologiques).
                 </p>
-
-                <div className="mt-2 flex items-center justify-between">
-                  <span className={confidenceClass(region.confidence)}>
-                    confiance {region.confidence}
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#0f4c81]">
-                    <Eye size={12} />
-                    Voir en 3D
-                  </span>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          <div className="rounded border border-slate-200 bg-white p-3">
-            <div className="mb-2 flex items-center gap-2">
-              <Search size={15} className="text-[#0f4c81]" />
-              <p className="text-[12px] font-bold text-slate-900">
-                Motifs détectés dans la séquence réelle
-              </p>
-            </div>
-
-            {motifs.length > 0 ? (
-              <div className="grid grid-cols-4 gap-2">
-                {motifs.map((motif, index) => (
-                  <button
-                    key={`${motif.start}-${motif.end}-${motif.motif}-${index}`}
-                    onClick={() => onFocusRange(motif)}
-                    className={`rounded border px-3 py-2 text-left text-[11px] transition ${
-                      activeRange?.start === motif.start &&
-                      activeRange?.end === motif.end
-                        ? "border-red-300 bg-red-50"
-                        : "border-slate-200 bg-slate-50 hover:border-red-200 hover:bg-red-50"
-                    }`}
-                  >
-                    <div className="mb-1 flex items-center justify-between">
-                      <span className="font-bold text-slate-900">
-                        {motif.label}
-                      </span>
-                      <span className="rounded bg-white px-2 py-0.5 font-mono text-[10px] text-slate-700">
-                        {motif.motif}
-                      </span>
-                    </div>
-                    <p className="text-slate-600">
-                      {motif.start}-{motif.end} · {motif.category}
-                    </p>
-                  </button>
-                ))}
+                <TopologyDiagram regions={domains} length={length} activeRange={activeRange} onSelect={onFocusRange} />
               </div>
-            ) : (
-              <p className="text-[12px] text-slate-500">
-                Aucun motif classique détecté par les règles simples.
-              </p>
             )}
-          </div>
-        </div>
 
-        <div className="col-span-4 space-y-2">
-          <div className="rounded border border-emerald-100 bg-emerald-50 p-3">
-            <div className="mb-2 flex items-center gap-2">
-              <ShieldCheck size={15} className="text-emerald-700" />
-              <p className="text-[12px] font-bold text-emerald-900">
-                Interprétation domaines
+            <div className="rounded-md border border-slate-200 p-3">
+              <h3 className="mb-0.5 text-[15px] font-semibold text-slate-900">Architecture des domaines</h3>
+              <p className="mb-2 text-[13px] text-slate-500">
+                Organisation linéaire de la séquence (1 → {length}) : domaines, segments
+                membranaires, motifs et régions annotés.
               </p>
+              <DomainArchitecture regions={domains} length={length} activeRange={activeRange} onSelect={onFocusRange} />
             </div>
 
-            <p className="text-[11px] leading-4 text-emerald-900">
-              Les domaines sont proposés à partir de la longueur et de la
-              séquence réelle. Les motifs détectés indiquent des zones
-              potentiellement importantes pour la modification, l’interaction ou
-              la régulation.
-            </p>
-          </div>
-
-          <div className="rounded border border-blue-100 bg-blue-50 p-3">
-            <div className="mb-2 flex items-center gap-2">
-              <Map size={15} className="text-blue-700" />
-              <p className="text-[12px] font-bold text-blue-900">
-                Règles utilisées
-              </p>
+            <details className="group rounded-md border border-slate-200">
+              <summary className="cursor-pointer list-none px-3 py-2 text-[14px] font-semibold text-slate-800 hover:bg-slate-50">
+                <span className="mr-1 inline-block transition group-open:rotate-90">▸</span>
+                Tableau des annotations ({domains.length})
+              </summary>
+            <div className="max-h-[320px] overflow-auto border-t border-slate-200">
+              <table className="w-full text-[14px]">
+                <thead className="sticky top-0 bg-slate-50 text-[13px] text-slate-600">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-semibold">Type</th>
+                    <th className="px-3 py-2 text-left font-semibold">Description</th>
+                    <th className="px-3 py-2 text-right font-semibold">Positions</th>
+                    <th className="px-3 py-2 text-right font-semibold">Longueur</th>
+                    <th className="px-3 py-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {domains.map((d, i) => (
+                    <tr
+                      key={`${d.start}-${d.end}-${i}`}
+                      className={`border-t border-slate-100 ${isActive(d) ? "bg-blue-50" : ""}`}
+                    >
+                      <td className="px-3 py-1.5">
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: d.color }} />
+                          {DOMAIN_STYLES[d.type]?.label ?? d.feature_type}
+                        </span>
+                      </td>
+                      <td className="px-3 py-1.5 text-slate-700">{d.label}</td>
+                      <td className="px-3 py-1.5 text-right font-mono">
+                        {d.start}–{d.end}
+                      </td>
+                      <td className="px-3 py-1.5 text-right font-mono">{d.end - d.start + 1}</td>
+                      <td className="px-3 py-1.5 text-right">
+                        <button
+                          onClick={() => onFocusRange(d)}
+                          className="inline-flex items-center gap-1 rounded border border-blue-200 px-2 py-0.5 text-[13px] text-blue-700 hover:bg-blue-50"
+                        >
+                          <Eye size={12} />
+                          3D
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-
-            <ul className="space-y-1 text-[11px] leading-4 text-blue-900">
-              <li>• Segmentation structurale selon longueur</li>
-              <li>• Scan de motifs : N-glycosylation, NPxY, PxxP</li>
-              <li>• Motifs basiques et cystéines proches</li>
-              <li>• Clic domaine/motif → zoom + coloration 3D</li>
-            </ul>
-          </div>
-
-          <div className="rounded border border-slate-200 bg-slate-50 p-3">
-            <p className="mb-2 text-[12px] font-bold text-slate-800">
-              Légende
+            </details>
+            <p className="text-[13px] text-slate-500">
+              Source : annotations UniProtKB (numérotation UniProt). La numérotation des
+              résidus d’une structure PDB peut différer de celle d’UniProt.
             </p>
-            <Legend color="#2563eb" label="Domaine principal" />
-            <Legend color="#7c3aed" label="Domaine secondaire" />
-            <Legend color="#f59e0b" label="Terminal / linker" />
-            <Legend color="#ef4444" label="Motif / région à vérifier" />
-            <Legend color="#0891b2" label="Domaine additionnel" />
+          </>
+        )}
+
+        <div className="rounded-md border border-slate-200 p-3">
+          <div className="mb-2 flex items-center gap-2">
+            <Search size={15} className="text-emerald-700" />
+            <p className="text-[14px] font-semibold text-slate-900">
+              Motifs courts détectés dans la séquence
+            </p>
           </div>
+          {!sequence ? (
+            <p className="text-[14px] text-slate-500">Séquence non disponible.</p>
+          ) : motifs.length > 0 ? (
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {motifs.map((motif, index) => (
+                <button
+                  key={`${motif.start}-${motif.end}-${motif.motif}-${index}`}
+                  onClick={() => onFocusRange(motif)}
+                  className={`rounded-md border px-3 py-2 text-left text-[13px] transition ${
+                    isActive(motif)
+                      ? "border-emerald-300 bg-emerald-50"
+                      : "border-slate-200 bg-slate-50 hover:bg-emerald-50"
+                  }`}
+                  title={motif.description}
+                >
+                  <div className="mb-0.5 flex items-center justify-between">
+                    <span className="font-semibold text-slate-900">{motif.label}</span>
+                    <span className="rounded bg-white px-1.5 py-0.5 font-mono text-[12px] text-slate-700">
+                      {motif.motif}
+                    </span>
+                  </div>
+                  <p className="text-slate-600">
+                    {motif.start}–{motif.end} · {motif.category}
+                  </p>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[14px] text-slate-500">Aucun motif détecté par ces règles.</p>
+          )}
+          <p className="mt-2 text-[12px] text-slate-400">
+            Motifs consensus (N-glycosylation, NPxY…) : sites potentiels, non vérifiés
+            expérimentalement.
+          </p>
         </div>
       </div>
     </section>
@@ -292,15 +265,15 @@ export default function StructuralDomains({
 
 function SectionTitle() {
   return (
-    <div className="flex items-center gap-2">
-      <Dna size={18} className="text-[#0f4c81]" />
+    <div className="flex items-center gap-2.5">
+      <span className="rounded-md bg-violet-600 p-2 text-white shadow-sm">
+        <Dna size={16} />
+      </span>
       <div>
-        <h2 className="text-[14px] font-bold text-slate-900">
-          Alignement séquence + domaines réels
-        </h2>
-        <p className="text-[11px] text-slate-500">
-          Analyse basée sur la séquence réelle et reliée au viewer 3D.
+        <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-violet-700">
+          UniProtKB
         </p>
+        <h2 className="text-[17px] font-semibold text-slate-900">Domaines et régions annotés</h2>
       </div>
     </div>
   );
@@ -413,210 +386,4 @@ function scanSequenceMotifs(sequence: string): SequenceMotif[] {
   }
 
   return motifs;
-}
-
-function buildDomainRegions(
-  length: number,
-  confidence: number | null
-): DomainRegion[] {
-  if (!length) return [];
-
-  const terminalSize = Math.min(35, Math.max(15, Math.round(length * 0.08)));
-  const uncertainColor =
-    confidence !== null && confidence >= 85 ? "#f59e0b" : "#ef4444";
-
-  if (length <= 150) {
-    return [
-      {
-        start: 1,
-        end: Math.min(length, terminalSize),
-        label: "N-terminal",
-        type: "terminal",
-        confidence: "medium",
-        color: uncertainColor,
-        description:
-          "Extrémité N-terminale souvent flexible, à inspecter en 3D.",
-      },
-      {
-        start: Math.min(length, terminalSize + 1),
-        end: Math.max(terminalSize + 1, length - terminalSize),
-        label: "Domaine compact",
-        type: "domain",
-        confidence: "high",
-        color: "#2563eb",
-        description:
-          "Bloc structural principal probable pour une protéine courte.",
-      },
-      {
-        start: Math.max(1, length - terminalSize + 1),
-        end: length,
-        label: "C-terminal",
-        type: "terminal",
-        confidence: "medium",
-        color: uncertainColor,
-        description:
-          "Extrémité C-terminale potentiellement mobile ou fonctionnelle.",
-      },
-    ];
-  }
-
-  if (length <= 350) {
-    const linkerStart = Math.round(length * 0.47);
-    const linkerEnd = Math.round(length * 0.55);
-
-    return [
-      {
-        start: 1,
-        end: terminalSize,
-        label: "N-terminal",
-        type: "terminal",
-        confidence: "medium",
-        color: uncertainColor,
-        description:
-          "Région N-terminale pouvant présenter une flexibilité.",
-      },
-      {
-        start: terminalSize + 1,
-        end: linkerStart - 1,
-        label: "Domaine 1",
-        type: "domain",
-        confidence: "high",
-        color: "#2563eb",
-        description:
-          "Premier domaine structural probable.",
-      },
-      {
-        start: linkerStart,
-        end: linkerEnd,
-        label: "Linker / charnière",
-        type: "linker",
-        confidence: "medium",
-        color: "#f59e0b",
-        description:
-          "Région intermédiaire pouvant agir comme charnière.",
-      },
-      {
-        start: linkerEnd + 1,
-        end: length - terminalSize,
-        label: "Domaine 2",
-        type: "domain",
-        confidence: "high",
-        color: "#7c3aed",
-        description:
-          "Second domaine structural probable.",
-      },
-      {
-        start: length - terminalSize + 1,
-        end: length,
-        label: "C-terminal",
-        type: "terminal",
-        confidence: "medium",
-        color: uncertainColor,
-        description:
-          "Extrémité C-terminale pouvant porter des signaux d’interaction.",
-      },
-    ];
-  }
-
-  const d1End = Math.round(length * 0.30);
-  const d2Start = Math.round(length * 0.36);
-  const d2End = Math.round(length * 0.62);
-  const d3Start = Math.round(length * 0.68);
-
-  return [
-    {
-      start: 1,
-      end: terminalSize,
-      label: "N-terminal",
-      type: "terminal",
-      confidence: "medium",
-      color: uncertainColor,
-      description:
-        "Extrémité N-terminale : région souvent flexible ou régulatrice.",
-    },
-    {
-      start: terminalSize + 1,
-      end: d1End,
-      label: "Domaine 1",
-      type: "domain",
-      confidence: "high",
-      color: "#2563eb",
-      description:
-        "Premier domaine probable, correspondant à un bloc structural compact.",
-    },
-    {
-      start: d1End + 1,
-      end: d2Start - 1,
-      label: "Linker 1",
-      type: "linker",
-      confidence: "medium",
-      color: "#f59e0b",
-      description:
-        "Possible région de connexion entre deux domaines.",
-    },
-    {
-      start: d2Start,
-      end: d2End,
-      label: "Domaine 2",
-      type: "domain",
-      confidence: "high",
-      color: "#7c3aed",
-      description:
-        "Domaine central probable, important pour la stabilité globale.",
-    },
-    {
-      start: d2End + 1,
-      end: d3Start - 1,
-      label: "Linker 2",
-      type: "linker",
-      confidence: "medium",
-      color: "#f59e0b",
-      description:
-        "Deuxième zone flexible potentielle entre deux blocs structuraux.",
-    },
-    {
-      start: d3Start,
-      end: length - terminalSize,
-      label: "Domaine 3",
-      type: "domain",
-      confidence: "medium",
-      color: "#0891b2",
-      description:
-        "Troisième domaine probable ou extension structurée à vérifier.",
-    },
-    {
-      start: length - terminalSize + 1,
-      end: length,
-      label: "C-terminal",
-      type: "terminal",
-      confidence: "medium",
-      color: uncertainColor,
-      description:
-        "Extrémité C-terminale : possible région flexible ou site d’interaction.",
-    },
-  ];
-}
-
-function confidenceClass(confidence: "high" | "medium" | "low") {
-  if (confidence === "high") {
-    return "rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800";
-  }
-
-  if (confidence === "medium") {
-    return "rounded bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800";
-  }
-
-  return "rounded bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-800";
-}
-
-function Legend({ color, label }: { color: string; label: string }) {
-  return (
-    <div className="mb-1 flex items-center gap-2 text-[11px] text-slate-700">
-      <span
-        className="h-3 w-3 rounded-sm"
-        style={{ backgroundColor: color }}
-      />
-      {label}
-    </div>
-  );
 }

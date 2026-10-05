@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { ExternalLink, Loader2, ShieldCheck, Waves } from "lucide-react";
-import Membrane3DViewer from "@/components/Membrane3DViewer";
+import { useEffect, useState } from "react";
+import { BookOpen, ChevronRight, ExternalLink, Layers, Loader2, Waves } from "lucide-react";
+import { API_BASE } from "@/lib/api";
+import Membrane3DViewer, { type OPMSubunit } from "@/components/Membrane3DViewer";
+import TopologyDiagram from "@/components/protein/TopologyDiagram";
+import type { Region } from "@/lib/topology";
 
 type HighlightRange = {
   start: number;
@@ -11,549 +14,613 @@ type HighlightRange = {
   color?: string;
 };
 
-type TMSegment = {
-  start: number;
-  end: number;
-  label?: string;
-  source?: string;
-  confidence?: string;
-  hydrophobic_score?: number;
-};
+type TMSegment = { start: number; end: number; label?: string; source?: string };
 
-type OrientationData = {
-  tm_count: number;
-  topology: string;
-  orientation_confidence: number;
-  estimated_hydrophobic_thickness?: number | null;
-  extracellular_side?: string;
-  cytoplasmic_side?: string;
-  interpretation?: string;
-};
-
-type MembraneOrientationResponse = {
+type OrientationResponse = {
   accession: string;
   available: boolean;
   sequence_length: number;
   method: string;
   tm_segments: TMSegment[];
-  orientation: OrientationData;
-  opm_role?: string;
-  opm_url?: string;
-  error?: string;
+  orientation: {
+    tm_count: number;
+    n_terminus: "in" | "out" | null;
+    c_terminus: "in" | "out" | null;
+    topology: string;
+    interpretation?: string;
+  };
 };
 
-const TM_COLORS = [
-  "#ef4444",
-  "#f97316",
-  "#dc2626",
-  "#fb923c",
-  "#b91c1c",
-  "#ea580c",
-  "#991b1b",
-];
+type OPMResponse = {
+  pdb_id: string;
+  available: boolean;
+  opm_id?: number;
+  opm_pdb_id?: string;
+  is_representative?: boolean;
+  url?: string;
+  oriented_pdb_url?: string;
+  name?: string;
+  resolution?: string | null;
+  type?: string;
+  class?: string;
+  superfamily?: string;
+  superfamily_pfam?: string | null;
+  family?: string;
+  family_pfam?: string | null;
+  family_interpro?: string | null;
+  family_tcdb?: string | null;
+  species?: string;
+  species_lineage?: string;
+  membrane?: string;
+  topology_in?: string;
+  topology_out?: string;
+  reference_chain?: string;
+  n_terminus?: "in" | "out" | null;
+  hydrophobic_thickness?: number | null;
+  thickness_error?: number | null;
+  tilt_angle?: number | null;
+  tilt_error?: number | null;
+  delta_g_transfer?: number | null;
+  subunits?: OPMSubunit[];
+  uniprot_codes?: string[];
+  comments?: string | null;
+  verification?: string | null;
+  citations?: { text: string; pmid: string | null }[];
+  secondary_representations?: { pdb_id: string; resolution: string | null }[];
+  message?: string;
+};
 
-export default function MembraneOrientation3DPanel({
+const SIDE = { in: "cytoplasmique", out: "extracellulaire / luminale" } as const;
+
+export default function MembraneOrientationPanel({
   accession,
   pdbId,
-  pdbUrl,
   activeRange,
   onFocusRange,
 }: {
   accession: string;
   pdbId?: string | null;
-  pdbUrl?: string | null;
   activeRange: HighlightRange | null;
   onFocusRange: (range: HighlightRange) => void;
 }) {
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<MembraneOrientationResponse | null>(null);
+  const [orientation, setOrientation] = useState<OrientationResponse | null>(null);
+  const [opm, setOpm] = useState<OPMResponse | null>(null);
+  const [loadingOrientation, setLoadingOrientation] = useState(false);
+  const [loadingOpm, setLoadingOpm] = useState(false);
+  const [regions, setRegions] = useState<Region[]>([]);
 
   useEffect(() => {
     if (!accession) return;
-
-    const load = async () => {
-      setLoading(true);
-
-      try {
-        const res = await fetch(
-          `http://127.0.0.1:8000/api/membrane-orientation/${accession}`
-        );
-        const json = await res.json();
-        setData(json);
-      } catch (error) {
-        console.error("Erreur orientation membranaire:", error);
-        setData(null);
-      }
-
-      setLoading(false);
+    let cancelled = false;
+    fetch(`${API_BASE}/api/domains/${accession}`)
+      .then((r) => r.json())
+      .then((json) => !cancelled && setRegions(json.domains ?? []))
+      .catch(() => !cancelled && setRegions([]));
+    return () => {
+      cancelled = true;
     };
-
-    load();
   }, [accession]);
 
-  const segments = data?.tm_segments || [];
-  const orientation = data?.orientation;
+  useEffect(() => {
+    if (!accession) return;
+    let cancelled = false;
+    setLoadingOrientation(true);
+    fetch(`${API_BASE}/api/membrane-orientation/${accession}`)
+      .then((r) => r.json())
+      .then((json) => !cancelled && setOrientation(json))
+      .catch(() => !cancelled && setOrientation(null))
+      .finally(() => !cancelled && setLoadingOrientation(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [accession]);
 
-  const proteinType = useMemo(() => {
-    const count = orientation?.tm_count || segments.length;
+  useEffect(() => {
+    setOpm(null);
+    if (!pdbId) return;
+    let cancelled = false;
+    setLoadingOpm(true);
+    fetch(`${API_BASE}/api/opm/${pdbId}`)
+      .then((r) => r.json())
+      .then((json) => !cancelled && setOpm(json))
+      .catch(() => !cancelled && setOpm(null))
+      .finally(() => !cancelled && setLoadingOpm(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [pdbId]);
 
-    if (count >= 7) return "Récepteur 7TM / GPCR-like";
-    if (count > 1) return "Protéine multipasse transmembranaire";
-    if (count === 1) return "Protéine single-pass";
-    return "Aucune région TM détectée";
-  }, [orientation?.tm_count, segments.length]);
+  const opmOk = !!opm?.available;
 
-  const opmUrl =
-    data?.opm_url ||
-    (pdbId ? `https://opm.phar.umich.edu/proteins/${pdbId.toLowerCase()}` : "");
+  if (!pdbId) {
+    return (
+      <div className="space-y-4">
+        <Notice>Sélectionnez une structure PDB pour afficher son orientation calculée par OPM.</Notice>
+        <UniProtTopology
+          regions={regions}
+          orientation={orientation}
+          loading={loadingOrientation}
+          activeRange={activeRange}
+          onFocusRange={onFocusRange}
+        />
+      </div>
+    );
+  }
+
+  if (loadingOpm) {
+    return (
+      <div className="flex h-[300px] items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white text-[14px] text-slate-500">
+        <Loader2 size={15} className="animate-spin text-cyan-600" />
+        Interrogation d’OPM pour {pdbId.toUpperCase()}…
+      </div>
+    );
+  }
 
   return (
-    <section className="rounded border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-slate-200 bg-[#f8fafc] px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Waves size={18} className="text-[#0f4c81]" />
-          <div>
-            <h2 className="text-[14px] font-bold text-slate-900">
-              Orientation membranaire
-            </h2>
-            <p className="text-[11px] text-slate-500">
-              Topologie UniProt · segments TM · visualisation 3D · référence OPM.
+    <div className="space-y-4">
+      {opmOk && opm ? (
+        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-4 py-3">
+            <div className="flex items-start gap-2.5">
+              <span className="mt-0.5 rounded-md bg-cyan-600 p-2 text-white shadow-sm">
+                <Waves size={16} />
+              </span>
+              <div>
+                <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-cyan-700">
+                  OPM · Orientations of Proteins in Membranes
+                </p>
+                <h2 className="text-[18px] font-semibold text-slate-900">
+                  <span className="font-mono">{opm.opm_pdb_id}</span> · {opm.name}
+                </h2>
+                <p className="text-[14px] text-slate-500">
+                  <span className="italic">{opm.species}</span>
+                  {opm.resolution && <> · résolution {opm.resolution} Å</>}
+                  {opm.membrane && <> · {opm.membrane}</>}
+                </p>
+              </div>
+            </div>
+            <a
+              href={opm.url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 rounded-md bg-cyan-600 px-3 py-1.5 text-[14px] font-semibold text-white hover:bg-cyan-700"
+            >
+              Fiche OPM
+              <ExternalLink size={13} />
+            </a>
+          </div>
+
+          {!opm.is_representative && (
+            <p className="border-b border-amber-100 bg-amber-50 px-4 py-2 text-[13px] text-amber-900">
+              {pdbId.toUpperCase()} est rattachée dans OPM à la structure représentative{" "}
+              <span className="font-mono font-semibold">{opm.opm_pdb_id}</span> : l’orientation et
+              les données ci-dessous concernent cette structure.
             </p>
+          )}
+
+          <div className="grid gap-4 p-4 xl:grid-cols-[1.35fr_1fr]">
+            <div className="space-y-3">
+              <dl className="grid gap-2 sm:grid-cols-3">
+                <BigMetric
+                  label="Épaisseur hydrophobe"
+                  value={formatWithError(opm.hydrophobic_thickness, opm.thickness_error, "Å")}
+                />
+                <BigMetric
+                  label="Angle d’inclinaison"
+                  value={formatWithError(opm.tilt_angle, opm.tilt_error, "°")}
+                />
+                <BigMetric
+                  label="ΔG de transfert"
+                  value={
+                    opm.delta_g_transfer != null
+                      ? `${opm.delta_g_transfer.toLocaleString("fr-FR")} kcal/mol`
+                      : "—"
+                  }
+                />
+              </dl>
+
+              <Membrane3DViewer
+                opmPdbId={opm.opm_pdb_id}
+                subunits={opm.subunits ?? []}
+                outsideLabel={capitalize(opm.topology_out) || "Côté externe"}
+                insideLabel={capitalize(opm.topology_in) || "Côté interne"}
+                activeRange={activeRange}
+              />
+
+              <dl className="grid gap-2 sm:grid-cols-2">
+                <Metric
+                  label="Topologie (OPM)"
+                  value={
+                    opm.n_terminus
+                      ? `N-terminal ${SIDE[opm.n_terminus]}${opm.reference_chain ? ` (chaîne ${opm.reference_chain})` : ""}`
+                      : "—"
+                  }
+                />
+                <Metric
+                  label="Côtés de la membrane"
+                  value={
+                    opm.topology_out && opm.topology_in
+                      ? `${capitalize(opm.topology_out)} / ${opm.topology_in}`
+                      : "—"
+                  }
+                />
+              </dl>
+              <p className="text-[12px] leading-4 text-slate-400">
+                Sphères rouges et bleues : limites du cœur hydrophobe calculées par OPM (faces
+                externe et interne). Épaisseur et ΔG : méthode PPM (Lomize et al.).
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <Section title="Classification">
+                <ol className="space-y-1 text-[14px]">
+                  <ClassRow level="Type" value={opm.type} />
+                  <ClassRow level="Classe" value={opm.class} />
+                  <ClassRow level="Superfamille" value={opm.superfamily} links={[["Pfam", opm.superfamily_pfam, pfamUrl]]} />
+                  <ClassRow
+                    level="Famille"
+                    value={opm.family}
+                    links={[
+                      ["Pfam", opm.family_pfam, pfamUrl],
+                      ["InterPro", opm.family_interpro, (id) => `https://www.ebi.ac.uk/interpro/entry/InterPro/${id}/`],
+                      ["TCDB", opm.family_tcdb, (id) => `https://www.tcdb.org/search/result.php?tc=${id}`],
+                    ]}
+                  />
+                </ol>
+              </Section>
+
+              <Section title="Protéine">
+                <dl className="space-y-1.5 text-[14px]">
+                  <Row label="Espèce">
+                    <span className="italic">{opm.species || "—"}</span>
+                  </Row>
+                  {opm.species_lineage && (
+                    <p className="text-[12px] leading-4 text-slate-400" title={opm.species_lineage}>
+                      {truncate(opm.species_lineage, 160)}
+                    </p>
+                  )}
+                  <Row label="Membrane">{opm.membrane || "—"}</Row>
+                  <Row label="UniProt">
+                    {opm.uniprot_codes?.length ? (
+                      <span className="flex flex-wrap justify-end gap-1">
+                        {opm.uniprot_codes.map((code) => (
+                          <a
+                            key={code}
+                            href={`https://www.uniprot.org/uniprotkb?query=id:${code}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[13px] text-slate-700 hover:bg-blue-50 hover:text-blue-700"
+                          >
+                            {code}
+                          </a>
+                        ))}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
+                  </Row>
+                </dl>
+              </Section>
+
+              {(opm.subunits?.length ?? 0) > 0 && (
+                <Section title={`Sous-unités transmembranaires (${opm.subunits!.length})`}>
+                  {opm.subunits!.length > 1 && (
+                    <p className="mb-2 text-[13px] leading-4 text-slate-600">
+                      {opm.subunits!.reduce((n, su) => n + su.segments.length, 0)} segments au
+                      total ({opm.subunits!.map((su) => su.segments.length).join(" + ")}). UniProt
+                      compte les segments d’une seule chaîne.
+                    </p>
+                  )}
+                  <div className="max-h-[220px] overflow-auto rounded border border-slate-100">
+                    <table className="w-full text-[13px]">
+                      <thead className="sticky top-0 bg-slate-50 text-slate-600">
+                        <tr>
+                          <th className="px-2 py-1 text-left font-semibold">Chaîne</th>
+                          <th className="px-2 py-1 text-right font-semibold">Inclinaison</th>
+                          <th className="px-2 py-1 text-right font-semibold">Segments</th>
+                          <th className="px-2 py-1 text-left font-semibold">Positions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {opm.subunits!.map((su) => (
+                          <tr key={su.chain} className="border-t border-slate-100 align-top">
+                            <td className="px-2 py-1 font-mono font-semibold">{su.chain}</td>
+                            <td className="px-2 py-1 text-right font-mono">{su.tilt != null ? `${su.tilt}°` : "—"}</td>
+                            <td className="px-2 py-1 text-right font-mono">{su.segments.length}</td>
+                            <td className="px-2 py-1 font-mono text-slate-600">
+                              {su.segments.map((s) => `${s.start}–${s.end}`).join(", ")}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="mt-1 text-[12px] text-slate-400">Numérotation des résidus de {opm.opm_pdb_id}.</p>
+                </Section>
+              )}
+
+              {(opm.comments || opm.verification) && (
+                <Section title="Remarques des curateurs OPM">
+                  {opm.comments && <p className="text-[14px] leading-5 text-slate-700">{opm.comments}</p>}
+                  {opm.verification && (
+                    <p className="mt-1 text-[14px] leading-5 text-slate-700">
+                      <span className="font-semibold">Vérification : </span>
+                      {opm.verification}
+                    </p>
+                  )}
+                </Section>
+              )}
+
+              {(opm.citations?.length ?? 0) > 0 && (
+                <Section title="Références" icon={<BookOpen size={13} />}>
+                  <ul className="space-y-1.5 text-[13px] leading-4 text-slate-700">
+                    {opm.citations!.map((c, i) => (
+                      <li key={i}>
+                        {c.text}{" "}
+                        {c.pmid && (
+                          <a
+                            href={`https://pubmed.ncbi.nlm.nih.gov/${c.pmid}/`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-medium text-blue-700 hover:underline"
+                          >
+                            PubMed {c.pmid}
+                          </a>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </Section>
+              )}
+
+              {(opm.secondary_representations?.length ?? 0) > 0 && (
+                <SecondaryList items={opm.secondary_representations!} />
+              )}
+            </div>
           </div>
-        </div>
-
-        {opmUrl && (
-          <a
-            href={opmUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 rounded bg-[#0f4c81] px-3 py-1 text-[11px] font-semibold text-white"
-          >
-            Consulter OPM
-            <ExternalLink size={12} />
-          </a>
-        )}
-      </div>
-
-      {loading ? (
-        <div className="flex h-[620px] items-center justify-center gap-2 text-[12px] text-slate-500">
-          <Loader2 size={15} className="animate-spin" />
-          Chargement de l’orientation membranaire...
-        </div>
+        </section>
       ) : (
-        <div className="grid grid-cols-12 gap-3 p-4">
-          <div className="col-span-7 space-y-3">
-            <TopologySummary
-              accession={accession}
-              proteinType={proteinType}
-              method={data?.method}
-              sequenceLength={data?.sequence_length}
-              orientation={orientation}
-              tmCount={segments.length}
-            />
+        <Notice>
+          {opm?.message || "OPM indisponible."} L’orientation dans la bicouche ne peut pas être
+          affichée pour {pdbId.toUpperCase()}.
+          {opm?.url && (
+            <>
+              {" "}
+              <a href={opm.url} target="_blank" rel="noreferrer" className="font-medium text-blue-700 hover:underline">
+                Rechercher dans OPM
+              </a>
+            </>
+          )}
+        </Notice>
+      )}
 
-            <TopologyDiagram
-              segments={segments}
-              topology={orientation?.topology || "-"}
-              activeRange={activeRange}
-              onFocusRange={onFocusRange}
-            />
+      <UniProtTopology
+        regions={regions}
+        orientation={orientation}
+        loading={loadingOrientation}
+        activeRange={activeRange}
+        onFocusRange={onFocusRange}
+      />
+    </div>
+  );
+}
 
-            <Membrane3DViewer
-              pdbId={pdbId}
-              pdbUrl={pdbUrl}
-              segments={segments}
-              activeRange={activeRange}
-            />
+function UniProtTopology({
+  regions,
+  orientation,
+  loading,
+  activeRange,
+  onFocusRange,
+}: {
+  regions: Region[];
+  orientation: OrientationResponse | null;
+  loading: boolean;
+  activeRange: HighlightRange | null;
+  onFocusRange: (range: HighlightRange) => void;
+}) {
+  const o = orientation?.orientation;
+  const segments = orientation?.tm_segments ?? [];
+  const length = orientation?.sequence_length || 0;
+
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white">
+      <div className="flex items-center gap-2.5 border-b border-slate-100 px-4 py-3">
+        <span className="rounded-md bg-amber-500 p-2 text-white shadow-sm">
+          <Layers size={16} />
+        </span>
+        <div>
+          <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-amber-700">UniProtKB</p>
+          <h2 className="text-[17px] font-semibold text-slate-900">Topologie de la chaîne</h2>
+        </div>
+      </div>
+      {loading ? (
+        <div className="flex items-center gap-2 p-4 text-[14px] text-slate-500">
+          <Loader2 size={14} className="animate-spin" />
+          Chargement…
+        </div>
+      ) : !o ? (
+        <p className="p-4 text-[14px] text-slate-500">Topologie indisponible.</p>
+      ) : (
+        <>
+        {regions.some((r) => r.type === "transmembrane" || r.type === "intramembrane") && (
+          <div className="border-b border-slate-100 p-4">
+            <TopologyDiagram regions={regions} length={length} activeRange={activeRange} onSelect={onFocusRange} />
           </div>
-
-          <div className="col-span-5 space-y-3">
-            <TMTable
-              segments={segments}
-              activeRange={activeRange}
-              onFocusRange={onFocusRange}
-            />
-
-            <OPMValidationCard
-              pdbId={pdbId}
-              opmUrl={opmUrl}
-              opmRole={data?.opm_role}
-              method={data?.method}
-              orientation={orientation}
-            />
-
-            <InterpretationCard
-              interpretation={orientation?.interpretation}
-              tmCount={orientation?.tm_count || segments.length}
-              topology={orientation?.topology}
-            />
+        )}
+        <div className="grid gap-4 p-4 lg:grid-cols-[1fr_1.2fr]">
+          <div className="space-y-2">
+            <dl className="grid grid-cols-2 gap-2">
+              <Metric label="Segments TM" value={`${o.tm_count}`} />
+              <Metric label="Source" value={orientation?.method || "—"} />
+              <Metric label="N-terminal" value={o.n_terminus ? SIDE[o.n_terminus] : "non annoté"} />
+              <Metric label="C-terminal" value={o.c_terminus ? SIDE[o.c_terminus] : "non annoté"} />
+            </dl>
+            {o.interpretation && <p className="text-[14px] leading-5 text-slate-600">{o.interpretation}</p>}
+          </div>
+          <div>
+            <div className="max-h-[220px] overflow-auto rounded-md border border-slate-200">
+              {segments.length ? (
+                <table className="w-full text-[14px]">
+                  <tbody>
+                    {segments.map((s, i) => {
+                      const active = activeRange?.start === s.start && activeRange?.end === s.end;
+                      return (
+                        <tr key={`${s.start}-${s.end}`} className={`border-t border-slate-100 first:border-t-0 ${active ? "bg-amber-50" : ""}`}>
+                          <td className="px-3 py-1.5 font-semibold text-amber-700">{s.label || `TM${i + 1}`}</td>
+                          <td className="px-3 py-1.5 text-right font-mono">
+                            {s.start}–{s.end}
+                          </td>
+                          <td className="px-3 py-1.5 text-right font-mono text-slate-500">{s.end - s.start + 1} aa</td>
+                          <td className="px-3 py-1.5 text-right">
+                            <button
+                              onClick={() => onFocusRange({ start: s.start, end: s.end, label: s.label || `TM${i + 1}`, color: "#d97706" })}
+                              className="rounded border border-amber-200 px-2 py-0.5 text-[13px] text-amber-800 hover:bg-amber-50"
+                            >
+                              3D
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="p-3 text-[14px] text-slate-500">Aucun segment transmembranaire.</p>
+              )}
+            </div>
+            <p className="mt-1 text-[12px] text-slate-400">Numérotation UniProt (peut différer de celle du PDB).</p>
           </div>
         </div>
+        </>
       )}
     </section>
   );
 }
 
-function TopologySummary({
-  accession,
-  proteinType,
-  method,
-  sequenceLength,
-  orientation,
-  tmCount,
-}: {
-  accession: string;
-  proteinType: string;
-  method?: string;
-  sequenceLength?: number;
-  orientation?: OrientationData;
-  tmCount: number;
-}) {
+function SecondaryList({ items }: { items: { pdb_id: string; resolution: string | null }[] }) {
+  const [all, setAll] = useState(false);
+  const shown = all ? items : items.slice(0, 24);
   return (
-    <div className="rounded border border-slate-200 bg-white p-3">
-      <div className="mb-3 flex items-center gap-2">
-        <ShieldCheck size={16} className="text-[#0f4c81]" />
-        <div>
-          <p className="text-[13px] font-bold text-slate-900">
-            Résumé topologique
-          </p>
-          <p className="text-[11px] text-slate-500">
-            Synthèse automatique de l’orientation membranaire.
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-2">
-        <MetricBox label="UniProt" value={accession} />
-        <MetricBox label="Type" value={proteinType} />
-        <MetricBox label="Méthode" value={method || "-"} />
-        <MetricBox label="Longueur" value={sequenceLength ? `${sequenceLength} aa` : "-"} />
-        <MetricBox label="Hélices TM" value={`${orientation?.tm_count ?? tmCount}`} />
-        <MetricBox label="Topologie" value={orientation?.topology || "-"} />
-        <MetricBox
-          label="Confiance"
-          value={`${orientation?.orientation_confidence ?? 0}%`}
-        />
-        <MetricBox
-          label="Épaisseur"
-          value={
-            typeof orientation?.estimated_hydrophobic_thickness === "number"
-              ? `≈ ${orientation.estimated_hydrophobic_thickness} Å`
-              : "-"
-          }
-        />
-        <MetricBox
-          label="Côtés"
-          value={
-            orientation?.extracellular_side && orientation?.cytoplasmic_side
-              ? "N/C définis"
-              : "-"
-          }
-        />
-      </div>
-    </div>
-  );
-}
-
-function TopologyDiagram({
-  segments,
-  topology,
-  activeRange,
-  onFocusRange,
-}: {
-  segments: TMSegment[];
-  topology: string;
-  activeRange: HighlightRange | null;
-  onFocusRange: (range: HighlightRange) => void;
-}) {
-  const nSide = topology.toLowerCase().includes("n-out")
-    ? "N-ter extracellulaire"
-    : "N-ter";
-
-  const cSide = topology.toLowerCase().includes("c-in")
-    ? "C-ter cytoplasmique"
-    : topology.toLowerCase().includes("c-out")
-    ? "C-ter extracellulaire"
-    : "C-ter";
-
-  return (
-    <div className="rounded border border-slate-200 bg-white p-3">
-      <div className="mb-3 flex items-center justify-between">
-        <div>
-          <p className="text-[13px] font-bold text-slate-900">
-            Schéma topologique
-          </p>
-          <p className="text-[11px] text-slate-500">
-            Représentation simplifiée type GPCR/OPM.
-          </p>
-        </div>
-
-        <span className="rounded bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-900">
-          {topology}
-        </span>
-      </div>
-
-      <div className="relative overflow-hidden rounded border border-slate-200 bg-[#f8fafc] p-4">
-        <div className="mb-2 flex items-center justify-between text-[11px] font-bold text-blue-900">
-          <span>{nSide}</span>
-          <span>Milieu extracellulaire</span>
-        </div>
-
-        <div className="relative h-[230px] rounded bg-white">
-          <div className="absolute left-0 right-0 top-[55px] h-[30px] bg-blue-100" />
-          <div className="absolute left-0 right-0 bottom-[55px] h-[30px] bg-blue-100" />
-          <div className="absolute left-0 right-0 top-[85px] bottom-[85px] bg-orange-100" />
-
-          <div className="absolute left-3 top-[61px] rounded bg-white px-2 py-1 text-[10px] font-bold text-blue-900 shadow-sm">
-            Feuillet externe
-          </div>
-
-          <div className="absolute left-3 bottom-[61px] rounded bg-white px-2 py-1 text-[10px] font-bold text-blue-900 shadow-sm">
-            Feuillet interne
-          </div>
-
-          <div className="absolute left-1/2 top-[105px] -translate-x-1/2 rounded bg-white px-2 py-1 text-[10px] font-bold text-orange-900 shadow-sm">
-            Noyau hydrophobe
-          </div>
-
-          <div className="absolute inset-x-0 top-[45px] flex h-[140px] items-center justify-center gap-3 px-4">
-            {segments.length > 0 ? (
-              segments.map((segment, index) => {
-                const color = TM_COLORS[index % TM_COLORS.length];
-                const active =
-                  activeRange?.start === segment.start &&
-                  activeRange?.end === segment.end;
-
-                return (
-                  <button
-                    key={`${segment.start}-${segment.end}-${index}`}
-                    onClick={() =>
-                      onFocusRange({
-                        start: segment.start,
-                        end: segment.end,
-                        label: segment.label || `TM${index + 1}`,
-                        color,
-                      })
-                    }
-                    className="relative flex flex-col items-center"
-                    title={`${segment.label || `TM${index + 1}`} ${segment.start}-${segment.end}`}
-                  >
-                    <span
-                      className={`block h-[132px] w-7 rounded-full shadow-md transition ${
-                        active ? "ring-4 ring-orange-200" : ""
-                      }`}
-                      style={{ backgroundColor: color }}
-                    />
-                    <span className="mt-1 rounded bg-white px-1.5 py-0.5 text-[9px] font-bold text-slate-700 shadow-sm">
-                      {segment.label || `TM${index + 1}`}
-                    </span>
-                  </button>
-                );
-              })
-            ) : (
-              <div className="rounded bg-white px-3 py-2 text-[12px] text-slate-500 shadow-sm">
-                Aucun segment transmembranaire détecté.
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-2 flex items-center justify-between text-[11px] font-bold text-blue-900">
-          <span>Milieu intracellulaire / cytoplasmique</span>
-          <span>{cSide}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TMTable({
-  segments,
-  activeRange,
-  onFocusRange,
-}: {
-  segments: TMSegment[];
-  activeRange: HighlightRange | null;
-  onFocusRange: (range: HighlightRange) => void;
-}) {
-  return (
-    <div className="rounded border border-slate-200 bg-white">
-      <div className="border-b border-slate-200 bg-slate-50 px-3 py-2">
-        <p className="text-[13px] font-bold text-slate-900">
-          Hélices transmembranaires
-        </p>
-        <p className="text-[11px] text-slate-500">
-          Positions issues des annotations UniProt ou de la prédiction.
-        </p>
-      </div>
-
-      <div className="max-h-[360px] overflow-auto">
-        {segments.length > 0 ? (
-          segments.map((segment, index) => {
-            const color = TM_COLORS[index % TM_COLORS.length];
-            const active =
-              activeRange?.start === segment.start &&
-              activeRange?.end === segment.end;
-
-            const length = segment.end - segment.start + 1;
-
-            return (
-              <button
-                key={`${segment.start}-${segment.end}-tm-table-${index}`}
-                onClick={() =>
-                  onFocusRange({
-                    start: segment.start,
-                    end: segment.end,
-                    label: segment.label || `TM${index + 1}`,
-                    color,
-                  })
-                }
-                className={`grid w-full grid-cols-12 items-center gap-2 border-b px-3 py-2 text-left text-[12px] last:border-b-0 ${
-                  active
-                    ? "bg-orange-50 text-orange-900"
-                    : "bg-white text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                <span className="col-span-3 flex items-center gap-2 font-bold">
-                  <span
-                    className="h-3 w-3 rounded"
-                    style={{ backgroundColor: color }}
-                  />
-                  {segment.label || `TM${index + 1}`}
-                </span>
-
-                <span className="col-span-3 font-semibold">
-                  {segment.start}–{segment.end}
-                </span>
-
-                <span className="col-span-2">{length} aa</span>
-
-                <span className="col-span-2 text-[11px]">
-                  {segment.confidence || "-"}
-                </span>
-
-                <span className="col-span-2 truncate text-[10px] text-slate-500">
-                  {segment.source || "-"}
-                </span>
-              </button>
-            );
-          })
-        ) : (
-          <p className="p-3 text-[12px] text-slate-500">
-            Aucun segment TM détecté pour cette protéine.
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function OPMValidationCard({
-  pdbId,
-  opmUrl,
-  opmRole,
-  method,
-  orientation,
-}: {
-  pdbId?: string | null;
-  opmUrl?: string;
-  opmRole?: string;
-  method?: string;
-  orientation?: OrientationData;
-}) {
-  return (
-    <div className="rounded border border-blue-100 bg-blue-50 p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <div>
-          <p className="text-[13px] font-bold text-blue-950">
-            Référence OPM
-          </p>
-          <p className="text-[11px] text-blue-800">
-            Source externe de validation lorsque l’entrée PDB existe.
-          </p>
-        </div>
-
-        {opmUrl && (
+    <Section title={`Autres structures de la même protéine dans OPM (${items.length})`}>
+      <div className="flex flex-wrap gap-1">
+        {shown.map((r) => (
           <a
-            href={opmUrl}
+            key={r.pdb_id}
+            href={`https://www.rcsb.org/structure/${r.pdb_id}`}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1 rounded bg-[#0f4c81] px-2 py-1 text-[10px] font-bold text-white"
+            title={r.resolution ? `Résolution ${r.resolution}` : undefined}
+            className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[13px] text-slate-700 hover:bg-blue-50 hover:text-blue-700"
           >
-            OPM
-            <ExternalLink size={11} />
+            {r.pdb_id}
           </a>
-        )}
+        ))}
       </div>
+      {items.length > 24 && (
+        <button onClick={() => setAll((v) => !v)} className="mt-1.5 text-[13px] font-medium text-blue-700 hover:underline">
+          {all ? "Réduire" : `Afficher les ${items.length}`}
+        </button>
+      )}
+    </Section>
+  );
+}
 
-      <div className="space-y-1">
-        <InfoLine label="PDB" value={pdbId || "-"} />
-        <InfoLine label="Rôle" value={opmRole || "External validation source"} />
-        <InfoLine label="Méthode" value={method || "-"} />
-        <InfoLine label="Topologie" value={orientation?.topology || "-"} />
-        <InfoLine
-          label="Épaisseur"
-          value={
-            typeof orientation?.estimated_hydrophobic_thickness === "number"
-              ? `≈ ${orientation.estimated_hydrophobic_thickness} Å`
-              : "-"
-          }
-        />
-      </div>
+function Section({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="rounded-md border border-slate-200 p-3">
+      <h3 className="mb-2 flex items-center gap-1.5 text-[14px] font-semibold text-slate-900">
+        {icon}
+        {title}
+      </h3>
+      {children}
     </div>
   );
 }
 
-function InterpretationCard({
-  interpretation,
-  tmCount,
-  topology,
+function ClassRow({
+  level,
+  value,
+  links = [],
 }: {
-  interpretation?: string;
-  tmCount: number;
-  topology?: string;
+  level: string;
+  value?: string | null;
+  links?: [string, string | null | undefined, (id: string) => string][];
 }) {
   return (
-    <div className="rounded border border-orange-100 bg-orange-50 p-3">
-      <p className="text-[13px] font-bold text-orange-950">
-        Interprétation biologique
-      </p>
-
-      <p className="mt-2 text-[12px] leading-5 text-orange-900">
-        {interpretation ||
-          `${tmCount} segment(s) transmembranaire(s) ont été détectés. La topologie prédite est ${topology || "-"}.`}
-      </p>
-
-      <p className="mt-3 rounded bg-white/70 p-2 text-[11px] leading-5 text-orange-900">
-        Cette orientation est une estimation bioinformatique basée sur les
-        annotations transmembranaires et les régions hydrophobes. L’entrée OPM
-        officielle reste la référence externe pour confirmer l’orientation
-        exacte dans la membrane.
-      </p>
-    </div>
-  );
-}
-
-function MetricBox({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded border border-slate-200 bg-slate-50 p-2">
-      <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">
-        {label}
-      </p>
-      <p className="mt-1 truncate text-[12px] font-black text-slate-900">
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function InfoLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-3 rounded bg-white/70 px-2 py-1 text-[11px]">
-      <span className="text-blue-800">{label}</span>
-      <span className="truncate text-right font-bold text-blue-950">
-        {value}
+    <li className="flex items-start gap-2">
+      <ChevronRight size={12} className="mt-1 shrink-0 text-slate-400" />
+      <span className="w-[86px] shrink-0 text-slate-500">{level}</span>
+      <span className="flex-1 font-medium text-slate-900">
+        {value || "—"}
+        {links
+          .filter(([, id]) => id)
+          .map(([label, id, url]) => (
+            <a
+              key={label}
+              href={url(id!)}
+              target="_blank"
+              rel="noreferrer"
+              className="ml-1.5 rounded bg-slate-100 px-1 py-0.5 font-mono text-[12px] font-normal text-slate-600 hover:bg-blue-50 hover:text-blue-700"
+            >
+              {label} {id}
+            </a>
+          ))}
       </span>
+    </li>
+  );
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <dt className="text-slate-500">{label}</dt>
+      <dd className="text-right font-medium text-slate-900">{children}</dd>
     </div>
   );
+}
+
+function BigMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-cyan-100 bg-cyan-50 px-3 py-2">
+      <dt className="text-[12px] font-semibold uppercase tracking-[0.08em] text-cyan-800">{label}</dt>
+      <dd className="text-[20px] font-bold text-slate-900">{value}</dd>
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+      <dt className="text-[12px] font-medium uppercase tracking-[0.08em] text-slate-500">{label}</dt>
+      <dd className="truncate text-[15px] font-semibold text-slate-900" title={value}>
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+function Notice({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="rounded-lg border border-slate-200 bg-white p-4 text-[14px] text-slate-600">{children}</p>
+  );
+}
+
+function formatWithError(value?: number | null, error?: number | null, unit = "") {
+  if (value == null) return "—";
+  const v = value.toLocaleString("fr-FR");
+  return error != null ? `${v} ± ${error.toLocaleString("fr-FR")} ${unit}` : `${v} ${unit}`;
+}
+
+function capitalize(text?: string) {
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
+}
+
+function truncate(text: string, n: number) {
+  return text.length > n ? `${text.slice(0, n)}…` : text;
+}
+
+function pfamUrl(id: string) {
+  return id.startsWith("CL")
+    ? `https://www.ebi.ac.uk/interpro/set/pfam/${id}/`
+    : `https://www.ebi.ac.uk/interpro/entry/pfam/${id}/`;
 }
