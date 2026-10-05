@@ -19,6 +19,7 @@ import {
   Download,
   ExternalLink,
   Eye,
+  GitBranch,
   GitCompare,
   Layers,
   LayoutDashboard,
@@ -39,6 +40,7 @@ import { API_BASE } from "@/lib/api";
 import { HERO_BG, HERO_GLOW } from "@/lib/theme";
 import PlddtProfile from "@/components/protein/PlddtProfile";
 import SaveToProject from "@/components/SaveToProject";
+import EvolutionPanel from "@/components/evolution/EvolutionPanel";
 import { mapRanges, type NumberedRange, type ResidueMapping } from "@/lib/mapping";
 
 const Structure3DViewer = dynamic(() => import("@/components/Structure3DViewer"), {
@@ -201,6 +203,7 @@ type TabKey =
   | "domains"
   | "active-site"
   | "comparison"
+  | "evolution"
   | "entries";
 
 const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
@@ -211,6 +214,7 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
   { key: "domains", label: "Domaines", icon: <Dna size={14} /> },
   { key: "active-site", label: "Site actif", icon: <Crosshair size={14} /> },
   { key: "comparison", label: "PDB / AlphaFold", icon: <GitCompare size={14} /> },
+  { key: "evolution", label: "Évolution", icon: <GitBranch size={14} /> },
   { key: "entries", label: "Entrées PDB", icon: <Database size={14} /> },
 ];
 
@@ -251,6 +255,12 @@ export default function StructurePage() {
   const [selectedPdb, setSelectedPdb] = useState<PDBStructure | null>(null);
   const [source, setSource] = useState<Source>("pdb");
   const [tab, setTab] = useState<TabKey>("overview");
+
+  // Onglet demandé dans l'adresse (?tab=evolution…)
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get("tab");
+    if (wanted && TABS.some((t) => t.key === wanted)) setTab(wanted as TabKey);
+  }, []);
   const [activeRange, setActiveRange] = useState<HighlightRange | null>(null);
 
   useEffect(() => {
@@ -667,6 +677,15 @@ export default function StructurePage() {
                 alphafold={alphafold}
                 activeRange={activeRange}
                 autoHighlightRanges={tmRanges}
+              />
+            )}
+
+            {tab === "evolution" && (
+              <EvolutionPanel
+                accession={accession}
+                pdbId={selectedPdb?.pdb_id}
+                alphafoldUrl={alphafold?.available ? alphafold.pdb_url : null}
+                mapping={mapping}
               />
             )}
 

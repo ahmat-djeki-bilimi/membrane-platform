@@ -19,6 +19,8 @@ type Structure3DViewerProps = {
   mode?: "pdb" | "alphafold";
   highlightRanges?: HighlightRange[];
   autoHighlightRanges?: HighlightRange[];
+  /** Coloration du ruban seul (ex. conservation), sans bâtonnets. */
+  colorRanges?: HighlightRange[];
 };
 
 export default function Structure3DViewer({
@@ -29,6 +31,7 @@ export default function Structure3DViewer({
   mode = "pdb",
   highlightRanges = [],
   autoHighlightRanges = [],
+  colorRanges = [],
 }: Structure3DViewerProps) {
   const viewerRef = useRef<HTMLDivElement | null>(null);
 
@@ -134,6 +137,16 @@ export default function Structure3DViewer({
         viewer.setStyle({}, { cartoon: { color: "#94a3b8", thickness: 0.55 } });
       }
 
+      colorRanges.forEach((range) => {
+        viewer.setStyle(
+          {
+            resi: buildResidueList(range.start, range.end),
+            ...(range.chain ? { chain: range.chain } : {}),
+          },
+          { cartoon: { color: range.color || "#94a3b8", thickness: 0.55 } }
+        );
+      });
+
       autoHighlightRanges.forEach((range) => {
         applyRangeStyle(range, range.color || "#f59e0b", false);
       });
@@ -181,6 +194,7 @@ export default function Structure3DViewer({
     mode,
     JSON.stringify(highlightRanges),
     JSON.stringify(autoHighlightRanges),
+    JSON.stringify(colorRanges),
   ]);
 
   return (

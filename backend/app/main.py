@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import jobs
 from app.config import get_settings
 from app.db import init_db
-from app.routers import accounts, membrane, proteins, structures, system
+from app.routers import accounts, evolution, membrane, proteins, structures, system
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s : %(message)s")
 logger = logging.getLogger("memprotscope")
@@ -48,7 +48,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    for module in (system, accounts, proteins, structures, membrane):
+    for module in (system, accounts, proteins, structures, membrane, evolution):
         app.include_router(module.router)
 
     @app.get("/", include_in_schema=False)
