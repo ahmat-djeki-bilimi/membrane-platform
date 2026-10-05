@@ -31,7 +31,7 @@ docker-compose.yml déploiement complet
 | Base de données | SQLite (`backend/data/`) | PostgreSQL |
 | File de calculs | Huey + SQLite, worker intégré à l'API | Huey + Redis, worker séparé |
 
-Les calculs longs (DeepTMHMM aujourd'hui ; alignements et phylogénie ensuite)
+Les calculs longs (DeepTMHMM, recherche d'homologues, conservation et arbres phylogénétiques)
 passent par la file : l'API répond immédiatement et le site suit l'avancement
 (`GET /api/jobs/{id}`). Un même calcul n'est jamais lancé deux fois.
 

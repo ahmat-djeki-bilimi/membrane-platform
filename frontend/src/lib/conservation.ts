@@ -61,7 +61,41 @@ export type ConservationResult = {
   };
   homologs: Homolog[];
   msa: { accession: string; organism: string; row: string }[];
+  tree?: PhyloTree | null;
   warnings: string[];
+};
+
+/** Nœud de l'arbre : feuille (`leaf` = indice dans `leaves`) ou nœud interne. */
+export type PhyloNode = {
+  length: number;
+  size: number;
+  leaf?: number;
+  support?: number | null;
+  children?: PhyloNode[];
+};
+
+export type PhyloLeaf = {
+  id: string;
+  organism: string | null;
+  taxon_id: number | null;
+  identity: number | null;
+  is_query: boolean;
+  group: string | null;
+  lineage: Record<string, string>;
+};
+
+export type PhyloTree = {
+  method: string;
+  bootstrap_replicates: number;
+  leaf_count: number;
+  max_distance: number;
+  saturated_pairs: number;
+  group_rank: string | null;
+  group_rank_label: string | null;
+  groups: { name: string; count: number }[];
+  leaves: PhyloLeaf[];
+  root: PhyloNode;
+  newick: string;
 };
 
 // Palette ConSurf : 1 (variable, turquoise) → 9 (conservé, bordeaux)

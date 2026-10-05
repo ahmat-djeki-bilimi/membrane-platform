@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { gradeColor, type ConservedPosition } from "@/lib/conservation";
 
@@ -34,6 +34,9 @@ export default function MsaViewer({
   selected,
   onSelect,
   regions = [],
+  treeOrder,
+  highlightId,
+  onSelectRow,
 }: {
   query: string;
   rows: { accession: string; organism: string; row: string }[];
@@ -42,10 +45,17 @@ export default function MsaViewer({
   onSelect?: (position: number) => void;
   /** Régions membranaires (hélices TM, boucles…) de la protéine étudiée. */
   regions?: MsaRegion[];
+  /** Accessions dans l'ordre des feuilles de l'arbre phylogénétique. */
+  treeOrder?: string[];
+  /** Séquence à surligner (espèce choisie dans l'arbre). */
+  highlightId?: string | null;
+  onSelectRow?: (id: string | null) => void;
 }) {
   const [start, setStart] = useState(1);
   const [showAll, setShowAll] = useState(false);
   const [highlightTM, setHighlightTM] = useState(true);
+  const [sortByTree, setSortByTree] = useState(true);
+  const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
   const [windowSize, setWindowSize] = useState(60);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const length = query.length;
@@ -70,7 +80,21 @@ export default function MsaViewer({
   useEffect(() => {
     if (start > Math.max(1, length - WINDOW + 1)) setStart(Math.max(1, length - WINDOW + 1));
   }, [WINDOW, length, start]);
-  const visibleRows = showAll ? rows : rows.slice(0, 30);
+  // Ordre de l'arbre : les espèces proches se suivent
+  const orderedRows = useMemo(() => {
+    if (!sortByTree || !treeOrder?.length) return rows;
+    const rank = new Map(treeOrder.map((id, i) => [id, i]));
+    return [...rows].sort((a, b) => (rank.get(a.accession) ?? 1e9) - (rank.get(b.accession) ?? 1e9));
+  }, [rows, treeOrder, sortByTree]);
+  const highlightIndex = highlightId ? orderedRows.findIndex((r) => r.accession === highlightId) : -1;
+  const visibleRows = showAll || highlightIndex >= 30 ? orderedRows : orderedRows.slice(0, 30);
+
+  // Amener à l'écran la séquence choisie dans l'arbre
+  useEffect(() => {
+    if (!highlightId) return;
+    const element = rowRefs.current.get(highlightId);
+    element?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightId]);
 
   // Suivre le résidu sélectionné ailleurs (profil, 3D)
   useEffect(() => {
@@ -130,6 +154,12 @@ export default function MsaViewer({
           className="min-w-[160px] flex-1 accent-[#0f4c81]"
           aria-label="Déplacer la fenêtre"
         />
+        {!!treeOrder?.length && (
+          <label className="flex items-center gap-1.5 text-slate-700">
+            <input type="checkbox" checked={sortByTree} onChange={(e) => setSortByTree(e.target.checked)} className="accent-[#0f4c81]" />
+            Ordre de l’arbre
+          </label>
+        )}
         {regions.some((r) => MEMBRANE_KINDS.has(r.kind)) && (
           <label className="flex items-center gap-1.5 text-slate-700">
             <input type="checkbox" checked={highlightTM} onChange={(e) => setHighlightTM(e.target.checked)} className="accent-amber-600" />
@@ -210,14 +240,30 @@ export default function MsaViewer({
               </td>
               <td className="whitespace-nowrap px-2">{columns.map((p) => cell(query[p - 1], p, true))}</td>
             </tr>
-            {visibleRows.map((r) => (
-              <tr key={r.accession} className="hover:bg-slate-50">
-                <td className="sticky left-0 w-[200px] min-w-[200px] max-w-[200px] truncate bg-white px-2 font-sans text-[13px] italic text-slate-600" title={`${r.organism} · ${r.accession}`}>
+            {visibleRows.map((r) => {
+              const isHighlighted = r.accession === highlightId;
+              return (
+              <tr
+                key={r.accession}
+                ref={(element) => {
+                  if (element) rowRefs.current.set(r.accession, element);
+                  else rowRefs.current.delete(r.accession);
+                }}
+                className={isHighlighted ? "bg-violet-100" : "hover:bg-slate-50"}
+              >
+                <td
+                  className={`sticky left-0 w-[200px] min-w-[200px] max-w-[200px] cursor-pointer truncate px-2 font-sans text-[13px] italic ${
+                    isHighlighted ? "bg-violet-100 font-semibold text-violet-900" : "bg-white text-slate-600"
+                  }`}
+                  title={`${r.organism} · ${r.accession}`}
+                  onClick={() => onSelectRow?.(isHighlighted ? null : r.accession)}
+                >
                   {r.organism.replace(/\s*\(.*\)$/, "")}
                 </td>
                 <td className="whitespace-nowrap px-2">{columns.map((p) => cell(r.row[p - 1], p, false))}</td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
