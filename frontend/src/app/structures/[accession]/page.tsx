@@ -18,7 +18,6 @@ import {
   Dna,
   Download,
   ExternalLink,
-  Eye,
   GitBranch,
   GitCompare,
   Layers,
@@ -41,6 +40,8 @@ import { HERO_BG, HERO_GLOW } from "@/lib/theme";
 import PlddtProfile from "@/components/protein/PlddtProfile";
 import SaveToProject from "@/components/SaveToProject";
 import EvolutionPanel from "@/components/evolution/EvolutionPanel";
+import PredictedStructurePanel from "@/components/prediction/PredictedStructurePanel";
+import ComparisonPanel from "@/components/prediction/ComparisonPanel";
 import { mapRanges, type NumberedRange, type ResidueMapping } from "@/lib/mapping";
 
 const Structure3DViewer = dynamic(() => import("@/components/Structure3DViewer"), {
@@ -197,24 +198,24 @@ type Source = "pdb" | "alphafold";
 
 type TabKey =
   | "overview"
-  | "viewer"
   | "quality"
   | "membrane"
   | "domains"
   | "active-site"
   | "comparison"
   | "evolution"
+  | "prediction"
   | "entries";
 
 const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
   { key: "overview", label: "Vue d’ensemble", icon: <LayoutDashboard size={14} /> },
-  { key: "viewer", label: "Visualisation 3D", icon: <Boxes size={14} /> },
   { key: "quality", label: "Qualité", icon: <ShieldCheck size={14} /> },
   { key: "membrane", label: "Membrane", icon: <Waves size={14} /> },
   { key: "domains", label: "Domaines", icon: <Dna size={14} /> },
   { key: "active-site", label: "Site actif", icon: <Crosshair size={14} /> },
   { key: "comparison", label: "PDB / AlphaFold", icon: <GitCompare size={14} /> },
   { key: "evolution", label: "Évolution", icon: <GitBranch size={14} /> },
+  { key: "prediction", label: "Structure prédite", icon: <Brain size={14} /> },
   { key: "entries", label: "Entrées PDB", icon: <Database size={14} /> },
 ];
 
@@ -374,14 +375,31 @@ export default function StructurePage() {
   const focus = (range: HighlightRange, target?: Source) => {
     if (target) setSource(target);
     setActiveRange(range);
-    setTab("viewer");
   };
 
-  const selectStructure = (structure: PDBStructure, openViewer = false) => {
+  const selectStructure = (structure: PDBStructure) => {
     setSelectedPdb(structure);
     setSource("pdb");
-    if (openViewer) setTab("viewer");
   };
+
+  // Vue 3D placée à côté du contenu des onglets Domaines, Site actif et Qualité
+  const withViewer = (content: React.ReactNode, viewerSource: Source) => (
+    <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_460px]">
+      <div className="min-w-0">{content}</div>
+      <div className="xl:sticky xl:top-4">
+        <FocusViewer
+          source={viewerSource}
+          selectedPdb={selectedPdb}
+          alphafold={alphafold}
+          mapping={mapping}
+          tmRanges={tmRanges}
+          extraRanges={viewerSource === "pdb" ? qualityRanges : []}
+          activeRange={activeRange}
+          setActiveRange={setActiveRange}
+        />
+      </div>
+    </div>
+  );
 
   return (
     <div className="flex min-h-screen flex-col bg-[#eef2f6] text-slate-900">
@@ -590,7 +608,7 @@ export default function StructurePage() {
                 />
                 <div className="grid gap-4 xl:grid-cols-2">
                   {selectedPdb ? (
-                    <SelectedStructureCard structure={selectedPdb} length={proteinLength} onView={() => setTab("viewer")} />
+                    <SelectedStructureCard structure={selectedPdb} length={proteinLength} />
                   ) : (
                     <EmptyCard text="Aucune structure expérimentale pour cette protéine." />
                   )}
@@ -617,31 +635,17 @@ export default function StructurePage() {
               </div>
             )}
 
-            {tab === "viewer" && (
-              <ViewerTab
-                mapping={mapping}
-                source={source}
-                accession={accession}
-                selectedPdb={selectedPdb}
-                alphafold={alphafold}
-                quality={quality}
-                loadingQuality={loadingQuality}
-                tmRanges={tmRanges}
-                qualityRanges={qualityRanges}
-                activeRange={activeRange}
-                setActiveRange={setActiveRange}
-              />
-            )}
-
-            {tab === "quality" && (
-              <QualityTab
-                selectedPdb={selectedPdb}
-                quality={quality}
-                loading={loadingQuality}
-                activeRange={activeRange}
-                onFocusRange={(r) => focus(r, "pdb")}
-              />
-            )}
+            {tab === "quality" &&
+              withViewer(
+                <QualityTab
+                  selectedPdb={selectedPdb}
+                  quality={quality}
+                  loading={loadingQuality}
+                  activeRange={activeRange}
+                  onFocusRange={(r) => focus(r, "pdb")}
+                />,
+                "pdb"
+              )}
 
             {tab === "membrane" && (
               <MembraneOrientationPanel
@@ -652,32 +656,49 @@ export default function StructurePage() {
               />
             )}
 
-            {tab === "domains" && (
-              <StructuralDomains
-                accession={accession}
-                alphafold={alphafold}
-                activeRange={activeRange}
-                onFocusRange={(r) => focus(r, alphafold?.available ? "alphafold" : "pdb")}
-                onClearFocus={() => setActiveRange(null)}
-              />
-            )}
+            {tab === "domains" &&
+              withViewer(
+                <StructuralDomains
+                  accession={accession}
+                  alphafold={alphafold}
+                  activeRange={activeRange}
+                  onFocusRange={(r) => focus(r)}
+                  onClearFocus={() => setActiveRange(null)}
+                />,
+                source
+              )}
 
-            {tab === "active-site" && (
-              <ActiveSitePanel
-                pdbId={selectedPdb?.pdb_id}
-                activeRange={activeRange}
-                onFocusRange={(r) => focus({ ...r, numbering: "pdb" }, "pdb")}
-              />
-            )}
+            {tab === "active-site" &&
+              withViewer(
+                <ActiveSitePanel
+                  pdbId={selectedPdb?.pdb_id}
+                  activeRange={activeRange}
+                  onFocusRange={(r) => focus({ ...r, numbering: "pdb" })}
+                />,
+                "pdb"
+              )}
 
             {tab === "comparison" && (
-              <MultiStructureComparison
-                accession={accession}
-                selectedPdb={selectedPdb}
-                alphafold={alphafold}
-                activeRange={activeRange}
-                autoHighlightRanges={tmRanges}
-              />
+              <div className="space-y-4">
+                {alphafold?.available && structures.length > 0 && (
+                  <ComparisonPanel
+                    accession={accession}
+                    esmfold={null}
+                    alphafoldAvailable
+                    models={["alphafold"]}
+                    entries={structures}
+                    defaultPdbId={selectedPdb?.pdb_id}
+                    fileBase={accession}
+                  />
+                )}
+                <MultiStructureComparison
+                  accession={accession}
+                  selectedPdb={selectedPdb}
+                  alphafold={alphafold}
+                  activeRange={activeRange}
+                  autoHighlightRanges={tmRanges}
+                />
+              </div>
             )}
 
             {tab === "evolution" && (
@@ -689,13 +710,21 @@ export default function StructurePage() {
               />
             )}
 
+            {tab === "prediction" && (
+              <PredictedStructurePanel
+                accession={accession}
+                experimentalEntries={structures}
+                defaultPdbId={selectedPdb?.pdb_id}
+              />
+            )}
+
             {tab === "entries" && (
               <div className="space-y-4">
                 <PDBTable
                   structures={structures}
                   total={pdbData?.total_count}
                   selected={selectedPdb}
-                  onSelect={(s) => selectStructure(s, true)}
+                  onSelect={(s) => selectStructure(s)}
                 />
                 {selectedPdb && <MacromoleculesPanel structure={selectedPdb} />}
               </div>
@@ -767,15 +796,7 @@ function Field({ label, value, mono = false }: { label: string; value: string; m
   );
 }
 
-function SelectedStructureCard({
-  structure,
-  length,
-  onView,
-}: {
-  structure: PDBStructure;
-  length: number;
-  onView: () => void;
-}) {
+function SelectedStructureCard({ structure, length }: { structure: PDBStructure; length: number }) {
   const snap = structure.experimental_snapshot;
   const v = structure.validation;
   return (
@@ -786,13 +807,6 @@ function SelectedStructureCard({
       tone="#2563eb"
       actions={
         <div className="flex gap-2">
-          <button
-            onClick={onView}
-            className="inline-flex items-center gap-1 rounded-md bg-[#0f4c81] px-2.5 py-1 text-[13px] font-semibold text-white hover:bg-[#0c3d68]"
-          >
-            <Eye size={12} />
-            Voir en 3D
-          </button>
           <a
             href={`https://www.rcsb.org/structure/${structure.pdb_id}`}
             target="_blank"
@@ -1240,189 +1254,111 @@ function CoverageMap({
 // Visualisation 3D
 // ---------------------------------------------------------------------------
 
-function ViewerTab({
-  mapping,
+/**
+ * Vue 3D compacte d'un onglet : structure PDB sélectionnée ou modèle
+ * AlphaFold, segments TM, résidus hors norme et sélection en cours.
+ */
+function FocusViewer({
   source,
-  accession,
   selectedPdb,
   alphafold,
-  quality,
-  loadingQuality,
+  mapping,
   tmRanges,
-  qualityRanges,
+  extraRanges,
   activeRange,
   setActiveRange,
 }: {
   source: Source;
-  accession: string;
   selectedPdb: PDBStructure | null;
   alphafold: AlphaFoldData | null;
-  quality: QualityData | null;
-  loadingQuality: boolean;
   mapping: ResidueMapping | null;
   tmRanges: HighlightRange[];
-  qualityRanges: HighlightRange[];
+  extraRanges: HighlightRange[];
   activeRange: HighlightRange | null;
   setActiveRange: (r: HighlightRange | null) => void;
 }) {
   const [showTM, setShowTM] = useState(true);
-  const [showOutliers, setShowOutliers] = useState(true);
-
+  const afUrl = alphafold?.available ? alphafold.pdb_url : null;
+  // Structure PDB si demandée et disponible ; sinon le modèle AlphaFold
+  const isPdb = (source === "pdb" || !afUrl) && !!selectedPdb;
+  const isAf = !isPdb && !!afUrl;
   // Structure PDB : conversion UniProt → numérotation de la structure (SIFTS).
   // Modèle AlphaFold : même numérotation qu'UniProt, aucune conversion.
-  const pdbTM = mapRanges(tmRanges, mapping);
-  const autoRanges = [...(showTM ? pdbTM : []), ...(source === "pdb" && showOutliers ? qualityRanges : [])];
   const pdbFocus = activeRange ? mapRanges([activeRange], mapping) : [];
-  const focusMissing = source === "pdb" && !!activeRange && pdbFocus.length === 0;
-  const isPdb = source === "pdb" && !!selectedPdb;
-  const isAf = source === "alphafold" && !!alphafold?.available && !!alphafold.pdb_url;
+  const focusMissing = isPdb && !!activeRange && pdbFocus.length === 0;
+  const pdbNumbered = activeRange?.numbering === "pdb";
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[1fr_380px]">
-      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
-          <div>
-            <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-              {isPdb ? "Structure expérimentale" : "Modèle AlphaFold"}
-            </p>
-            <h2 className="text-[17px] font-semibold text-slate-900">
-              {isPdb ? `${selectedPdb!.pdb_id} · ${shortMethod(selectedPdb!.method)}` : alphafold?.model_id || "—"}
-            </h2>
-          </div>
-          <div className="flex flex-wrap items-center gap-3 text-[13px] text-slate-700">
-            <label className="flex items-center gap-1.5">
-              <input type="checkbox" checked={showTM} onChange={(e) => setShowTM(e.target.checked)} className="accent-amber-600" />
-              Segments TM
-            </label>
-            {source === "pdb" && (
-              <label className="flex items-center gap-1.5">
-                <input type="checkbox" checked={showOutliers} onChange={(e) => setShowOutliers(e.target.checked)} className="accent-rose-600" />
-                Résidus hors régions Ramachandran
-              </label>
-            )}
-            {activeRange && (
-              <button
-                onClick={() => setActiveRange(null)}
-                className="rounded-md border border-slate-200 px-2 py-0.5 font-medium hover:bg-slate-50"
-              >
-                Effacer la sélection ({activeRange.label || `${activeRange.start}–${activeRange.end}`})
-              </button>
-            )}
-          </div>
-        </div>
-        {focusMissing && (
-          <p className="border-b border-amber-100 bg-amber-50 px-4 py-2 text-[13px] text-amber-900">
-            La région sélectionnée ({activeRange!.label || `${activeRange!.start}–${activeRange!.end}`}) n’est pas
-            modélisée dans {selectedPdb?.pdb_id}. Choisissez une autre structure ou le modèle AlphaFold.
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            {isPdb ? "Structure expérimentale" : "Modèle AlphaFold"}
           </p>
-        )}
-        <div className="h-[540px]">
-          {isPdb ? (
-            <Structure3DViewer
-              pdbId={selectedPdb!.pdb_id}
-              mode="pdb"
-              highlightRanges={pdbFocus}
-              autoHighlightRanges={autoRanges}
-            />
-          ) : isAf ? (
-            <Structure3DViewer
-              pdbUrl={alphafold!.pdb_url}
-              mode="alphafold"
-              highlightRanges={activeRange ? [activeRange] : []}
-              autoHighlightRanges={showTM ? tmRanges : []}
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center text-[15px] text-slate-400">
-              Aucun modèle disponible pour cette source.
-            </div>
+          <h3 className="text-[15px] font-semibold text-slate-900">
+            {isPdb ? `${selectedPdb!.pdb_id} · ${shortMethod(selectedPdb!.method)}` : alphafold?.model_id || "—"}
+          </h3>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-[13px] text-slate-700">
+          <label className="flex items-center gap-1.5">
+            <input type="checkbox" checked={showTM} onChange={(e) => setShowTM(e.target.checked)} className="accent-amber-600" />
+            Segments TM
+          </label>
+          {activeRange && (
+            <button
+              onClick={() => setActiveRange(null)}
+              className="rounded-md border border-slate-200 px-2 py-0.5 font-medium hover:bg-slate-50"
+            >
+              Effacer ({activeRange.label || `${activeRange.start}–${activeRange.end}`})
+            </button>
           )}
         </div>
-        <div className="flex flex-wrap gap-3 border-t border-slate-100 px-4 py-2 text-[13px] text-slate-600">
-          {source === "alphafold" ? (
-            PLDDT_BANDS.map((b) => (
-              <span key={b.key} className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: b.color }} />
-                pLDDT {b.label.toLowerCase()}
-              </span>
-            ))
-          ) : (
-            <>
-              <LegendDot color="#d97706" label="Segment transmembranaire" />
-              <LegendDot color={RAMA_COLORS.outlier} label="Résidu hors régions Ramachandran" />
-            </>
-          )}
-          <LegendDot color="#7c3aed" label="Sélection" />
-          <span className="ml-auto text-slate-400">
-            {source === "alphafold"
-              ? "Numérotation UniProt (identique à celle du modèle)."
-              : mapping?.available
-              ? `Annotations converties dans la numérotation de ${mapping.pdb_id} (SIFTS)${mapping.identity ? ", identique à UniProt" : ""}.`
-              : "Correspondance SIFTS indisponible : numérotation UniProt utilisée."}
-          </span>
-        </div>
-        {tmRanges.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 border-t border-slate-100 px-4 py-2">
-            {tmRanges.map((r) => (
-              <button
-                key={`${r.start}-${r.end}`}
-                onClick={() => setActiveRange({ ...r, color: "#7c3aed" })}
-                className={`rounded border px-2 py-0.5 text-[13px] font-medium ${
-                  activeRange?.start === r.start && activeRange?.end === r.end
-                    ? "border-violet-300 bg-violet-50 text-violet-800"
-                    : "border-amber-200 text-amber-800 hover:bg-amber-50"
-                }`}
-              >
-                {r.label} · {r.start}–{r.end}
-              </button>
-            ))}
+      </div>
+      {focusMissing && (
+        <p className="border-b border-amber-100 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+          La sélection ({activeRange!.label || `${activeRange!.start}–${activeRange!.end}`}) n’est pas modélisée dans{" "}
+          {selectedPdb?.pdb_id}. Choisissez une autre structure ou le modèle AlphaFold.
+        </p>
+      )}
+      <div className="h-[460px]">
+        {isPdb ? (
+          <Structure3DViewer
+            pdbId={selectedPdb!.pdb_id}
+            mode="pdb"
+            highlightRanges={pdbFocus}
+            autoHighlightRanges={[...(showTM ? mapRanges(tmRanges, mapping) : []), ...extraRanges]}
+          />
+        ) : isAf ? (
+          <Structure3DViewer
+            pdbUrl={afUrl!}
+            mode="alphafold"
+            // Une sélection numérotée comme le PDB ne s'applique pas au modèle AlphaFold
+            highlightRanges={activeRange && !pdbNumbered ? [activeRange] : []}
+            autoHighlightRanges={showTM ? tmRanges : []}
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center p-6 text-center text-[15px] text-slate-400">
+            Aucune structure 3D disponible.
           </div>
         )}
-      </section>
-
-      <aside className="space-y-4">
-        {source === "pdb" ? (
-          <section className="rounded-lg border border-slate-200 bg-white p-3">
-            <h3 className="text-[15px] font-semibold text-slate-900">Diagramme de Ramachandran</h3>
-            <p className="mb-2 text-[13px] text-slate-500">Angles φ/ψ calculés depuis {selectedPdb?.pdb_id ?? "la structure"}</p>
-            {loadingQuality ? (
-              <PanelSpinner text="Calcul des angles φ/ψ…" />
-            ) : (
-              <RamachandranPlot
-                points={quality?.ramachandran?.points ?? []}
-                onSelect={(p) =>
-                  setActiveRange({
-                    start: p.resi,
-                    end: p.resi,
-                    label: `${p.resn}${p.resi} (${p.chain})`,
-                    chain: p.chain,
-                    numbering: "pdb",
-                    color: "#7c3aed",
-                  })
-                }
-              />
-            )}
-          </section>
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-slate-100 px-3 py-2 text-[12px] text-slate-600">
+        {isAf ? (
+          PLDDT_BANDS.map((b) => (
+            <span key={b.key} className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: b.color }} />
+              pLDDT {b.label.toLowerCase()}
+            </span>
+          ))
         ) : (
-          <section className="rounded-lg border border-slate-200 bg-white p-3 text-[14px] text-slate-600">
-            <h3 className="text-[15px] font-semibold text-slate-900">Lecture du modèle AlphaFold</h3>
-            <p className="mt-1 leading-5">
-              Les couleurs indiquent le pLDDT, la confiance locale du modèle. Les régions orange
-              (pLDDT &lt; 50) sont souvent désordonnées et ne doivent pas être interprétées comme
-              une conformation réelle.
-            </p>
-            <a
-              href={`https://alphafold.ebi.ac.uk/entry/${accession}`}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-2 inline-flex items-center gap-1 text-[14px] font-medium text-violet-700 hover:underline"
-            >
-              Voir la fiche AlphaFold DB
-              <ExternalLink size={12} />
-            </a>
-          </section>
+          <>
+            <LegendDot color="#d97706" label="Segment TM" />
+            {extraRanges.length > 0 && <LegendDot color={RAMA_COLORS.outlier} label="Hors régions Ramachandran" />}
+          </>
         )}
-      </aside>
-    </div>
+        <LegendDot color="#7c3aed" label="Sélection" />
+      </div>
+    </section>
   );
 }
 
@@ -1861,8 +1797,8 @@ function PDBTable({
                       onClick={() => onSelect(s)}
                       className="inline-flex items-center gap-1 rounded bg-[#0f4c81] px-2 py-0.5 text-[13px] font-semibold text-white hover:bg-[#0c3d68]"
                     >
-                      <Eye size={12} />
-                      3D
+                      <CheckCircle2 size={12} />
+                      Choisir
                     </button>
                   </td>
                 </tr>
