@@ -61,7 +61,7 @@ export default function PredictedStructurePanel({
   const header = {
     tone: "cyan" as const,
     icon: <Brain size={16} />,
-    label: "IA · ESMFold",
+    label: "Prédiction · ESMFold",
     title: "Structure prédite dans la membrane",
   };
 
