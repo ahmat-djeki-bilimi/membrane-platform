@@ -414,14 +414,14 @@ def _mmseqs_alignment(query: str) -> tuple[list[str], list[dict], dict]:
         if coverage < MIN_COVERAGE or identity < MIN_IDENTITY_EXTENDED:
             excluded += 1
             continue
-        kept.append((row, hit["id"], identity, coverage))
+        kept.append((row, hit["id"], identity, coverage, hit.get("bits"), hit.get("evalue"), hit.get("target_length")))
         if len(kept) >= MAX_EXTENDED_SEQUENCES:
             break
 
     # Organismes des séquences affichées (alignement et tableau)
     organisms = fetch_uniref_organisms([k[1] for k in kept[:MAX_HOMOLOGS_RETURNED]])
     homologs = []
-    for row, identifier, identity, coverage in kept:
+    for row, identifier, identity, coverage, bits, evalue, length in kept:
         info = organisms.get(identifier, {})
         homologs.append(
             {
@@ -431,9 +431,11 @@ def _mmseqs_alignment(query: str) -> tuple[list[str], list[dict], dict]:
                 "organism": info.get("organism"),
                 "taxon_id": info.get("taxon_id"),
                 "reviewed": False,
-                "length": None,
+                "length": int(length) if length else None,
                 "identity": round(identity, 3),
                 "coverage": round(coverage, 3),
+                "bits": bits,
+                "evalue": evalue,
                 "link": f"https://www.uniprot.org/uniref/{identifier}",
             }
         )

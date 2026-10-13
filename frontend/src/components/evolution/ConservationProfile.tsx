@@ -125,7 +125,7 @@ export default function ConservationProfile({
             {shown.gap_fraction > 0.2 && <> · {Math.round(shown.gap_fraction * 100)} % de gaps</>}
           </>
         ) : (
-          "Survolez le profil pour lire la conservation d’un résidu ; cliquez pour le voir en 3D."
+          `Survolez le profil pour lire la conservation d’un résidu${onSelect ? " ; cliquez pour le sélectionner" : ""}.`
         )}
       </div>
     </div>

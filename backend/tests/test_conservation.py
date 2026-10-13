@@ -138,6 +138,7 @@ def test_parse_a3m_removes_insertions():
     hits = parse_a3m(a3m, 8)
     assert [h["id"] for h in hits] == ["UniRef100_A0A001", "UniRef100_A0A002"]
     assert hits[0]["row"] == "MKTAYIAR" and hits[0]["identity"] == 0.875
+    assert hits[0]["bits"] == 120 and hits[0]["evalue"] == 1e-30
     assert hits[1]["row"] == "--TAYIA-"
 
 

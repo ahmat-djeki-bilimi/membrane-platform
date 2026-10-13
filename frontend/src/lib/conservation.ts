@@ -23,7 +23,12 @@ export type Homolog = {
   length: number | null;
   identity: number;
   coverage: number;
-  link?: string;
+  /** Score de l'alignement en bits et E-value (Explorateur). */
+  bits?: number | null;
+  evalue?: number | null;
+  /** Origine : fichier importé ou recherche étendue MMseqs2. */
+  source?: "mmseqs";
+  link?: string | null;
 };
 
 export type ConservationSource = "uniref50" | "mmseqs";

@@ -128,15 +128,26 @@ def parse_a3m(a3m: str, query_length: int) -> list[dict]:
         if len(row) != query_length:
             continue
         identifier = fields[0].split()[0]
-        identity = None
-        if len(fields) > 2:
-            try:
-                identity = float(fields[2])
-            except ValueError:
-                identity = None
-        hits.append({"id": identifier, "row": row, "identity": identity})
+        # En-tête MMseqs2 : identifiant, score (bits), identité, E-value, positions…
+        hits.append(
+            {
+                "id": identifier,
+                "row": row,
+                "bits": _number(fields, 1),
+                "identity": _number(fields, 2),
+                "evalue": _number(fields, 3),
+                "target_length": _number(fields, 9),
+            }
+        )
     # La première séquence est la requête elle-même
     return hits[1:] if hits and hits[0]["id"] in ("query", "101") else hits
+
+
+def _number(fields: list[str], index: int) -> float | None:
+    try:
+        return float(fields[index])
+    except (IndexError, ValueError):
+        return None
 
 
 def fetch_uniref_organisms(ids: list[str]) -> dict[str, dict]:

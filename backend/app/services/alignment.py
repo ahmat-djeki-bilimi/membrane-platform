@@ -8,6 +8,7 @@ alignement multiple « ancré » sur celle-ci, adapté au calcul de la
 conservation de chacun de ses résidus.
 """
 
+import math
 from dataclasses import dataclass
 
 _ORDER = "ARNDCQEGHILKMFPSTWYVBZX"
@@ -46,6 +47,9 @@ _NORMALIZE = str.maketrans({"U": "C", "O": "K", "J": "L"})
 
 GAP_OPEN = -11
 GAP_EXTEND = -1
+# Statistique de Karlin-Altschul pour BLOSUM62 et gaps 11/1 (paramètres de BLAST)
+KA_LAMBDA = 0.267
+KA_K = 0.041
 _NEG = float("-inf")
 
 
@@ -175,3 +179,31 @@ def align_to_query(query: str, subject: str, band: int = 100) -> PairAlignment:
     aligned = [(q, s) for q, s in zip(a, anchored) if s != "-"]
     identity = sum(q == s for q, s in aligned) / len(aligned) if aligned else 0.0
     return PairAlignment("".join(anchored), identity, len(aligned) / n, int(score))
+
+
+def significance(score: float, query_length: int, subject_length: int) -> tuple[float, float]:
+    """
+    Score en bits et E-value d'un alignement de deux séquences (Karlin &
+    Altschul, 1990) : nombre d'alignements de ce score attendus par hasard
+    entre deux séquences aléatoires de ces longueurs.
+    """
+    bits = (KA_LAMBDA * score - math.log(KA_K)) / math.log(2)
+    evalue = KA_K * query_length * subject_length * math.exp(-KA_LAMBDA * score)
+    return bits, evalue
+
+
+def anchored_score(query: str, row: str) -> int:
+    """Score BLOSUM62 d'une ligne d'alignement ancrée (gaps internes pénalisés, extrémités libres)."""
+    a, b = _clean(query), row.upper()
+    covered = [k for k, c in enumerate(b) if c != "-"]
+    if not covered:
+        return 0
+    score, in_gap = 0, False
+    for k in range(covered[0], covered[-1] + 1):
+        if b[k] == "-":
+            score += GAP_EXTEND + (0 if in_gap else GAP_OPEN)
+            in_gap = True
+        else:
+            score += BLOSUM62[a[k]].get(b[k], BLOSUM62[a[k]]["X"])
+            in_gap = False
+    return score
