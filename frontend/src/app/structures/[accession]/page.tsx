@@ -702,12 +702,7 @@ export default function StructurePage() {
             )}
 
             {tab === "evolution" && (
-              <EvolutionPanel
-                accession={accession}
-                pdbId={selectedPdb?.pdb_id}
-                alphafoldUrl={alphafold?.available ? alphafold.pdb_url : null}
-                mapping={mapping}
-              />
+              <EvolutionPanel accession={accession} />
             )}
 
             {tab === "prediction" && (

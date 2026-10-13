@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import MiniProteinViewer from "../components/MiniProteinViewer";
 import SiteHeader from "../components/SiteHeader";
 import SiteFooter from "../components/SiteFooter";
@@ -18,6 +19,7 @@ import {
   GitCompare,
   BarChart3,
   ChevronRight,
+  Sparkles,
 } from "lucide-react";
 
 const FEATURED = [
@@ -183,6 +185,27 @@ export default function HomePage() {
 
       <main className="w-full space-y-4 px-4 py-4 lg:px-6">
         <SequencePaste id="sequence" />
+
+        <Link
+          href="/explorateur"
+          className="group flex flex-wrap items-center gap-4 rounded-lg border border-emerald-200 bg-gradient-to-r from-emerald-50 via-white to-violet-50 p-4 hover:border-emerald-400"
+        >
+          <span className="rounded-md bg-emerald-600 p-2.5 text-white shadow-sm">
+            <Sparkles size={18} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[12px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Nouveau module</span>
+            <span className="block text-[17px] font-semibold text-slate-900">Membrane Evolution &amp; Function Explorer</span>
+            <span className="block text-[14px] text-slate-600">
+              Importez une famille de protéines homologues (FASTA) : conservation, topologie et orientation membranaire,
+              carte 3D des résidus candidats et coévolution des hélices.
+            </span>
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-2 text-[14px] font-semibold text-white group-hover:bg-emerald-700">
+            Ouvrir l’explorateur
+            <ChevronRight size={15} />
+          </span>
+        </Link>
 
         <section id="pipeline" className="scroll-mt-16 rounded-lg border border-slate-200 bg-white">
           <SectionHeader

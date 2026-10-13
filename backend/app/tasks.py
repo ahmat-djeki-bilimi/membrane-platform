@@ -29,6 +29,7 @@ else:
 def _runners() -> dict[str, Callable[[dict], dict]]:
     """Calculs disponibles, par type de tâche."""
     from app.services.conservation_service import compute_conservation, compute_sequence_conservation
+    from app.services.explorer_service import run_explorer
     from app.services.membrane_service import predict_topology_isolated
     from app.services.structure_prediction_service import predict_structure
 
@@ -36,6 +37,7 @@ def _runners() -> dict[str, Callable[[dict], dict]]:
         "deeptmhmm": lambda p: predict_topology_isolated(p["sequence"], p.get("name", "query")),
         "conservation": lambda p: compute_conservation(p["accession"], p.get("source", "uniref50")),
         "conservation_sequence": lambda p: compute_sequence_conservation(p["sequence"], p.get("name", "query")),
+        "explorer": lambda p: run_explorer(p["fasta"], p.get("reference", 0), p.get("accession"), p.get("expand", False)),
         "structure_prediction": lambda p: predict_structure(
             p["sequence"],
             name=p.get("name", "query"),

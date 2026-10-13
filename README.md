@@ -61,6 +61,30 @@ Site : http://localhost:3000
 Réglages optionnels : copier `backend/.env.example` en `backend/.env` et
 `frontend/.env.example` en `frontend/.env.local`.
 
+## Membrane Evolution & Function Explorer
+
+Page `/explorateur` (import), résultats sur `/explorateur/<tâche>` avec un onglet par étape : analyse d'une famille de protéines membranaires
+homologues importée en FASTA (ou orthologues UniRef50 d'une entrée UniProt,
+avec option de recherche étendue MMseqs2).
+
+1. Homologues : alignement ancré sur la séquence de référence (ou alignement
+   fourni repris tel quel).
+2. Conservation de chaque position (Jensen-Shannon, grades 1–9) et arbre
+   phylogénétique (Neighbor-Joining, bootstrap).
+3. Topologie (DeepTMHMM, UniProt ou Kyte-Doolittle) et orientation : modèle
+   AlphaFold DB (ou ESMFold) placé dans la membrane, comparé à OPM.
+4. Cartographie : profondeur, enfouissement et positions candidates
+   (fonctionnelles, structurales, interface) avec leurs raisons.
+5. Coévolution, deux méthodes sur le même alignement : MIp (information
+   mutuelle + APC : paires, carte de contacts confrontée au modèle, réseaux) et
+   SCA (Statistical Coupling Analysis + ICA : secteurs de résidus), chacune
+   cartographiée sur la structure dans la membrane, puis comparées.
+
+La page d'une protéine n'en garde qu'un aperçu (onglet Évolution : profil de
+conservation) avec un lien vers l'Explorateur.
+
+Route : `POST /api/explorer` (calcul en file), `GET /api/explorer/homologs/{accession}`.
+
 ## Comptes et projets
 
 Les utilisateurs créent un compte (`/connexion`), puis enregistrent leurs
