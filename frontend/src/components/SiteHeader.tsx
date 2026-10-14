@@ -2,14 +2,15 @@ import Link from "next/link";
 import { Layers3 } from "lucide-react";
 import UserMenu from "./UserMenu";
 
-type Section = "home" | "search" | "explorer" | "projects";
+type Section = "home" | "search" | "explorer" | "comparison" | "analyses" | "projects";
 
 const LINKS: { href: string; label: string; section?: Section }[] = [
   { href: "/", label: "Accueil", section: "home" },
   { href: "/search", label: "Recherche", section: "search" },
   { href: "/explorateur", label: "Explorateur", section: "explorer" },
+  { href: "/comparaison", label: "Comparaison", section: "comparison" },
   { href: "/#pipeline", label: "Pipeline" },
-  { href: "/#analyses", label: "Analyses" },
+  { href: "/analyses", label: "Analyses", section: "analyses" },
   { href: "/#structures", label: "Structures" },
 ];
 

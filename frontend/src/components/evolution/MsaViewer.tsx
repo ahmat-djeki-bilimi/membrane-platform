@@ -220,15 +220,20 @@ export default function MsaViewer({
               <td className="whitespace-nowrap px-2">
                 {columns.map((p) => {
                   const grade = positions[p - 1]?.grade ?? 1;
+                  const masked = positions[p - 1]?.masked;
                   return (
                     <span
                       key={p}
                       onClick={() => onSelect?.(p)}
                       className="inline-block w-[15px] cursor-pointer text-center font-sans text-[11px] font-semibold"
-                      style={{ backgroundColor: gradeColor(grade), color: grade >= 8 ? "#ffffff" : "#0f172a" }}
-                      title={`Position ${p} · grade ${grade}/9`}
+                      style={
+                        masked
+                          ? { backgroundColor: "#e2e8f0", color: "#64748b" }
+                          : { backgroundColor: gradeColor(grade), color: grade >= 8 ? "#ffffff" : "#0f172a" }
+                      }
+                      title={masked ? `Position ${p} · colonne masquée par le contrôle qualité` : `Position ${p} · grade ${grade}/9`}
                     >
-                      {grade}
+                      {masked ? "×" : grade}
                     </span>
                   );
                 })}

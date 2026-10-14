@@ -69,8 +69,15 @@ export default function ConservationProfile({
           0
         </text>
 
+        <defs>
+          <pattern id="masked-hatch" width={4} height={4} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <rect width={4} height={4} fill="#f1f5f9" />
+            <line x1={0} y1={0} x2={0} y2={4} stroke="#94a3b8" strokeWidth={1.5} />
+          </pattern>
+        </defs>
         {positions.map((p) => {
-          const h = Math.max((p.score / max) * PLOT_H, 1);
+          // Colonne masquée par le contrôle qualité : hachurée sur toute la hauteur, hors classement
+          const h = p.masked ? PLOT_H : Math.max((p.score / max) * PLOT_H, 1);
           return (
             <rect
               key={p.position}
@@ -78,8 +85,8 @@ export default function ConservationProfile({
               y={TOP + PLOT_H - h}
               width={Math.max(barW - (barW > 3 ? 0.5 : 0), 0.6)}
               height={h}
-              fill={gradeColor(p.grade)}
-              stroke={p.grade === 5 ? "#cbd5e1" : "none"}
+              fill={p.masked ? "url(#masked-hatch)" : gradeColor(p.grade)}
+              stroke={!p.masked && p.grade === 5 ? "#cbd5e1" : "none"}
               strokeWidth={0.4}
             />
           );
@@ -123,6 +130,7 @@ export default function ConservationProfile({
               <> · résidus observés : {shown.top_residues.map((r) => `${r.residue} ${Math.round(r.frequency * 100)} %`).join(", ")}</>
             )}
             {shown.gap_fraction > 0.2 && <> · {Math.round(shown.gap_fraction * 100)} % de gaps</>}
+            {shown.masked && <b className="text-slate-800"> · colonne masquée (contrôle qualité) : grade indicatif</b>}
           </>
         ) : (
           `Survolez le profil pour lire la conservation d’un résidu${onSelect ? " ; cliquez pour le sélectionner" : ""}.`

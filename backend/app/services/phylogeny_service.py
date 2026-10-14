@@ -3,7 +3,9 @@ Arbre phylogénétique des homologues à partir de l'alignement multiple.
 
 1. Distances entre séquences : proportion de résidus différents sur les
    positions alignées des deux côtés (gaps exclus), corrigée par la formule de
-   Kimura (1983) pour les protéines : d = -ln(1 - p - 0,2 p²).
+   Kimura (1983) pour les protéines : d = -ln(1 - p - 0,2 p²) (par défaut),
+   par le modèle de Poisson d = -ln(1 - p), ou laissée telle quelle (distance p).
+   Les colonnes masquées par le contrôle qualité sont exclues.
 2. Arbre par Neighbor-Joining (Saitou & Nei, 1987), enraciné au point médian.
 3. Robustesse des branches par bootstrap (Felsenstein, 1985) : les colonnes de
    l'alignement sont rééchantillonnées, l'arbre est reconstruit, et chaque
@@ -28,6 +30,27 @@ MIN_OVERLAP = 20
 MAX_DISTANCE = 3.0
 BOOTSTRAP_REPLICATES = 100
 MAX_GROUPS = 8
+STRONG_SUPPORT = 0.7
+
+# Modèles de distance (correction des substitutions multiples)
+MODELS = {
+    "kimura": {
+        "label": "Kimura (1983) pour les protéines",
+        "formula": "d = −ln(1 − p − 0,2 p²)",
+        "text": "Corrige les substitutions multiples au même site ; adapté aux homologues moyennement divergents.",
+    },
+    "poisson": {
+        "label": "Poisson",
+        "formula": "d = −ln(1 − p)",
+        "text": "Toutes les substitutions également probables ; corrige moins que Kimura les séquences éloignées.",
+    },
+    "p": {
+        "label": "Distance p (non corrigée)",
+        "formula": "d = p",
+        "text": "Proportion de sites différents, sans correction : sous-estime les distances des séquences éloignées.",
+    },
+}
+DEFAULT_MODEL = "kimura"
 
 RANKS = [
     ("domain", "Domaine"),
@@ -56,8 +79,13 @@ def _encode(rows: list[str]) -> tuple[np.ndarray, np.ndarray]:
     return onehot, present.astype(np.float32)
 
 
-def kimura_distances(onehot: np.ndarray, present: np.ndarray, weights: np.ndarray | None = None) -> np.ndarray:
-    """Matrice des distances de Kimura, colonnes éventuellement pondérées (bootstrap)."""
+def kimura_distances(
+    onehot: np.ndarray,
+    present: np.ndarray,
+    weights: np.ndarray | None = None,
+    model: str = DEFAULT_MODEL,
+) -> np.ndarray:
+    """Matrice des distances (Kimura par défaut), colonnes éventuellement pondérées (bootstrap)."""
     n, length, _ = onehot.shape
     w = np.ones(length, dtype=np.float32) if weights is None else weights.astype(np.float32)
     flat = (onehot * w[None, :, None]).reshape(n, -1)
@@ -66,12 +94,34 @@ def kimura_distances(onehot: np.ndarray, present: np.ndarray, weights: np.ndarra
 
     with np.errstate(divide="ignore", invalid="ignore"):
         p = 1.0 - identical / overlap
-        argument = 1.0 - p - 0.2 * p * p
-        d = -np.log(argument)
-    d = np.where((overlap < MIN_OVERLAP) | ~np.isfinite(d) | (argument <= 0), MAX_DISTANCE, d)
-    d = np.minimum(d, MAX_DISTANCE)
+        if model == "p":
+            argument = np.ones_like(p)
+            d = p
+        elif model == "poisson":
+            argument = 1.0 - p
+            d = -np.log(argument)
+        else:
+            argument = 1.0 - p - 0.2 * p * p
+            d = -np.log(argument)
+    # Plafond : distance p au plus 1 (aucun site identique)
+    ceiling = 1.0 if model == "p" else MAX_DISTANCE
+    d = np.where((overlap < MIN_OVERLAP) | ~np.isfinite(d) | (argument <= 0), ceiling, d)
+    d = np.minimum(d, ceiling)
     np.fill_diagonal(d, 0.0)
     return d.astype(np.float64)
+
+
+def informative_sites(rows: list[str]) -> int:
+    """Sites informatifs : au moins deux acides aminés présents chacun dans au moins deux séquences."""
+    count = 0
+    for column in zip(*rows):
+        counts: dict[str, int] = {}
+        for c in column:
+            if c in _INDEX:
+                counts[c] = counts.get(c, 0) + 1
+        if sum(1 for v in counts.values() if v >= 2) >= 2:
+            count += 1
+    return count
 
 
 # ---------------------------------------------------------------------------
@@ -287,6 +337,54 @@ def choose_rank(lineages: list[dict[str, str] | None]) -> tuple[str, str] | None
 
 
 # ---------------------------------------------------------------------------
+# Limites d'interprétation
+# ---------------------------------------------------------------------------
+
+def interpretation_limits(n: int, replicates: int, d: dict) -> tuple[str, list[str]]:
+    """Fiabilité de l'arbre (« correcte », « prudence », « insuffisante ») et limites à signaler."""
+    limits, severe = [], False
+    if n < 8:
+        limits.append(f"Seulement {n} séquences : la topologie est très incertaine ; ajoutez des homologues.")
+        severe = severe or n < 6
+    if d["informative_sites"] < 50:
+        limits.append(
+            f"Seulement {d['informative_sites']} site(s) informatif(s) (au moins deux acides aminés partagés chacun par "
+            "deux séquences) : trop peu de signal pour ordonner les embranchements."
+        )
+        severe = severe or d["informative_sites"] < 20
+    if d["saturated_fraction"] > 0.05:
+        limits.append(
+            f"{round(d['saturated_fraction'] * 100)} % des paires sont trop divergentes ou se recouvrent trop peu : "
+            "distance plafonnée, longueurs des branches longues non fiables."
+        )
+    if d["mean_overlap"] is not None and d["mean_overlap"] < 0.6:
+        limits.append(
+            f"Les séquences ne partagent en moyenne que {round(d['mean_overlap'] * 100)} % de positions alignées : "
+            "fragments ou domaines différents, distances calculées sur peu de sites."
+        )
+    if d["strong_fraction"] is not None and d["strong_fraction"] < 0.3:
+        limits.append(
+            f"{round(d['strong_fraction'] * 100)} % seulement des embranchements ont un bootstrap ≥ 70 % : l'ordre des "
+            "branchements internes n'est pas établi ; ne lisez que les groupes soutenus."
+        )
+        severe = severe or d["strong_fraction"] < 0.1
+    if not replicates:
+        limits.append("Aucun réplicat de bootstrap : la robustesse des branches n'est pas évaluée.")
+    if d["median_identity"] is not None and d["median_identity"] > 0.9:
+        limits.append(
+            f"Séquences très proches de la référence (identité médiane {round(d['median_identity'] * 100)} %) : "
+            "peu de substitutions, arbre peu résolu."
+        )
+    if d["median_identity"] is not None and d["median_identity"] < 0.25:
+        limits.append(
+            f"Séquences très divergentes (identité médiane {round(d['median_identity'] * 100)} %) : saturation des "
+            "substitutions et alignement moins sûr."
+        )
+    level = "insuffisante" if severe else "prudence" if limits else "correcte"
+    return level, limits
+
+
+# ---------------------------------------------------------------------------
 # Point d'entrée
 # ---------------------------------------------------------------------------
 
@@ -297,13 +395,18 @@ def build_tree(
     homologs: list[dict],
     replicates: int = BOOTSTRAP_REPLICATES,
     seed: int = 1,
+    lineages: dict[int, dict[str, str]] | None = None,
+    model: str = DEFAULT_MODEL,
+    mask: list[bool] | None = None,
 ) -> dict | None:
     """
     Arbre Neighbor-Joining de la séquence étudiée et des homologues affichés
-    dans l'alignement. `msa` : lignes {accession, organism, row}.
+    dans l'alignement. `msa` : lignes {accession, organism, row}. `mask` :
+    colonnes exclues (contrôle qualité de l'alignement).
     """
     if len(msa) + 1 < MIN_SEQUENCES:
         return None
+    model = model if model in MODELS else DEFAULT_MODEL
 
     by_accession = {h["accession"]: h for h in homologs}
     leaves = [
@@ -327,20 +430,23 @@ def build_tree(
             }
         )
     rows = [query_row] + [line["row"] for line in msa]
+    masked = sum(mask) if mask and len(mask) == len(query_row) else 0
+    if masked and masked < len(query_row):
+        rows = ["".join(c for c, m in zip(row, mask) if not m) for row in rows]
     n = len(rows)
 
     onehot, present = _encode(rows)
-    distances = kimura_distances(onehot, present)
+    distances = kimura_distances(onehot, present, model=model)
     edges = neighbor_joining(distances)
 
     # Bootstrap : colonnes tirées avec remise
     rng = np.random.default_rng(seed)
-    length = len(query_row)
+    length = len(rows[0])
     counts: dict[int, int] = {}
     reference = splits(edges, n)
     for _ in range(replicates):
         weights = np.bincount(rng.integers(0, length, length), minlength=length)
-        for split in splits(neighbor_joining(kimura_distances(onehot, present, weights)), n) & reference:
+        for split in splits(neighbor_joining(kimura_distances(onehot, present, weights, model)), n) & reference:
             counts[split] = counts.get(split, 0) + 1
     supports = {s: counts.get(s, 0) / replicates for s in reference} if replicates else {}
 
@@ -348,7 +454,11 @@ def build_tree(
     _annotate(root, supports, n)
 
     # Groupes taxonomiques
-    lineages = fetch_lineages([leaf["taxon_id"] for leaf in leaves])
+    # Lignées déjà connues (Explorateur) : seules les espèces manquantes sont demandées
+    lineages = dict(lineages or {})
+    missing = [leaf["taxon_id"] for leaf in leaves if leaf["taxon_id"] and leaf["taxon_id"] not in lineages]
+    if missing:
+        lineages.update(fetch_lineages(missing))
     rank = choose_rank([lineages.get(leaf["taxon_id"]) for leaf in leaves])
     groups: dict[str, int] = {}
     for leaf in leaves:
@@ -358,12 +468,36 @@ def build_tree(
         if leaf["group"]:
             groups[leaf["group"]] = groups.get(leaf["group"], 0) + 1
 
+    ceiling = 1.0 if model == "p" else MAX_DISTANCE
+    saturated = int(np.sum(np.triu(distances >= ceiling, 1)))
+    pair_overlap = (present @ present.T)[np.triu_indices(n, 1)] / max(length, 1)
+    identities = [leaf["identity"] for leaf in leaves if not leaf["is_query"] and leaf["identity"] is not None]
+    diagnostics = {
+        "informative_sites": informative_sites(rows),
+        "columns": length,
+        "masked_columns": masked,
+        "mean_overlap": round(float(pair_overlap.mean()), 3) if len(pair_overlap) else None,
+        "saturated_fraction": round(saturated / max(n * (n - 1) / 2, 1), 3),
+        "median_identity": round(float(np.median(identities)), 3) if identities else None,
+        "mean_support": round(float(np.mean(list(supports.values()))), 3) if supports else None,
+        "strong_fraction": round(sum(v >= STRONG_SUPPORT for v in supports.values()) / len(supports), 3) if supports else None,
+        "internal_branches": len(reference),
+    }
+    level, limits = interpretation_limits(n, replicates, diagnostics)
+
     return {
-        "method": "Distances de Kimura + Neighbor-Joining, racine au point médian",
+        "method": f"Distances {MODELS[model]['label']} + Neighbor-Joining, racine au point médian",
+        "reconstruction": "Neighbor-Joining (Saitou & Nei, 1987), méthode de distances",
+        "model": {"id": model, **MODELS[model]},
+        "rooting": "Point médian du plus long chemin entre deux séquences (pas de groupe externe)",
+        "support": {"method": "Bootstrap non paramétrique (Felsenstein, 1985)", "replicates": replicates, "strong": STRONG_SUPPORT},
+        "diagnostics": diagnostics,
+        "reliability": level,
+        "limits": limits,
         "bootstrap_replicates": replicates,
         "leaf_count": n,
-        "max_distance": MAX_DISTANCE,
-        "saturated_pairs": int(np.sum(np.triu(distances >= MAX_DISTANCE, 1))),
+        "max_distance": ceiling,
+        "saturated_pairs": saturated,
         "group_rank": rank[0] if rank else None,
         "group_rank_label": rank[1] if rank else None,
         "groups": [{"name": g, "count": c} for g, c in sorted(groups.items(), key=lambda kv: -kv[1])],

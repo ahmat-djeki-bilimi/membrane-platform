@@ -10,6 +10,7 @@ from app import jobs
 from app.services import sifts_service, uniprot_service
 from app.services.active_site_service import detect_active_site
 from app.services.alphafold_service import get_alphafold
+from app.services.model_analysis_service import analyze_alphafold_model
 from app.services.opm_service import get_opm_data
 from app.services.pdb_service import get_pdb_structures
 from app.services.esmfold_service import MAX_LENGTH as ESMFOLD_MAX_LENGTH
@@ -39,6 +40,19 @@ def pdb_structures(accession: str):
 @router.get("/alphafold/{accession}")
 def alphafold_model(accession: str):
     return get_alphafold(accession.upper().strip())
+
+
+@router.get("/alphafold/{accession}/analysis")
+def alphafold_analysis(accession: str):
+    """
+    Analyse du modèle AlphaFold (protéines sans structure PDB) : correspondance
+    avec la séquence UniProt, confiance, géométrie, contacts, poches potentielles
+    et sites UniProt classés selon leur preuve.
+    """
+    accession = accession.upper().strip()
+    if not re.fullmatch(r"[A-Z0-9]{6,10}", accession):
+        raise HTTPException(400, "Accession UniProt invalide.")
+    return analyze_alphafold_model(accession)
 
 
 @router.get("/quality/{pdb_id}")

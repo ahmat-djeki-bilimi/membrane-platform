@@ -6,7 +6,8 @@ import ConservationProfile from "@/components/evolution/ConservationProfile";
 import MsaViewer from "@/components/evolution/MsaViewer";
 import { CONSURF_COLORS } from "@/lib/conservation";
 import { layoutTree } from "@/lib/phylo";
-import type { ExplorerResult } from "@/lib/explorer";
+import type { ExplorerResult, QualityParams } from "@/lib/explorer";
+import AlignmentQuality from "./AlignmentQuality";
 
 const fmt = (v?: number | null) =>
   v == null ? "—" : v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -24,10 +25,17 @@ export default function ConservationTab({
   result,
   selected,
   onSelect,
+  quality,
+  onApplyQuality,
+  fileBase,
 }: {
   result: ExplorerResult;
   selected: number | null;
   onSelect: (position: number) => void;
+  /** Réglages du contrôle qualité de l'analyse affichée. */
+  quality?: QualityParams | null;
+  onApplyQuality?: (params: QualityParams | null) => Promise<void>;
+  fileBase: string;
 }) {
   const s = result.summary;
   // Ordre des feuilles de l'arbre, proposé pour l'alignement
@@ -42,6 +50,8 @@ export default function ConservationTab({
 
   return (
     <div className="space-y-4">
+      <AlignmentQuality result={result} applied={quality} selected={selected} onSelect={onSelect} onApply={onApplyQuality} fileBase={fileBase} />
+
       <section className="rounded-lg border border-slate-200 bg-white p-4">
         <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
           <h3 className="text-[16px] font-semibold text-slate-900">Conservation résidu par résidu</h3>
@@ -87,7 +97,8 @@ export default function ConservationTab({
           <p className="mt-3 text-[13px] leading-5 text-slate-500">
             Score : divergence de Jensen-Shannon (Capra &amp; Singh, 2007), séquences pondérées (Henikoff), pénalisé par
             les gaps. Grades 1 à 9 relatifs à la protéine, comme ConSurf. Les positions à plus de 30 % de gaps ne
-            figurent pas parmi les variables.
+            figurent pas parmi les variables ; les colonnes masquées par le contrôle qualité (hachurées) ne sont ni
+            classées ni proposées.
           </p>
         </section>
 

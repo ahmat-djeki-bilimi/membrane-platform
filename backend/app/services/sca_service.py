@@ -111,10 +111,60 @@ def _robust_z(values: np.ndarray) -> np.ndarray:
     return (values - median) / mad if mad > 0 else np.zeros_like(values)
 
 
-def compute_sca(rows: list[str], trials: int = TRIALS, seed: int = 1) -> dict:
+def positional_conservation(onehot: np.ndarray, weights: np.ndarray, pseudocount: float = PSEUDOCOUNT) -> np.ndarray:
+    """Conservation de chaque position : entropie relative D_i par rapport aux fréquences de fond (pySCA)."""
+    w = weights / weights.sum()
+    fi = (1 - pseudocount) * np.einsum("n,nla->la", w, onehot) + pseudocount / (AMINO + 1)
+    q = BACKGROUND / BACKGROUND.sum()
+    return (fi * np.log(fi / q)).sum(axis=1)
+
+
+def _spearman(a: np.ndarray, b: np.ndarray) -> float | None:
+    if len(a) < 3 or np.std(a) == 0 or np.std(b) == 0:
+        return None
+    ra, rb = np.argsort(np.argsort(a)), np.argsort(np.argsort(b))
+    return round(float(np.corrcoef(ra, rb)[0, 1]), 2)
+
+
+def conservation_matched_z(matrix: np.ndarray, conservation: np.ndarray, columns: list[int], draws: int = 300, seed: int = 1) -> float | None:
+    """
+    Covariance collective d'un secteur au-delà de la conservation : couplage SCA
+    moyen à l'intérieur du secteur, comparé à des groupes de même taille tirés
+    au hasard parmi des positions de conservation semblable (même quintile).
+    """
+    if len(columns) < 2:
+        return None
+    bins = np.digitize(conservation, np.quantile(conservation, [0.2, 0.4, 0.6, 0.8]))
+    pools = {b: np.flatnonzero(bins == b) for b in range(5)}
+    rng = np.random.default_rng(seed)
+
+    def inside(cols):
+        sub = matrix[np.ix_(cols, cols)]
+        return (sub.sum() - np.trace(sub)) / (len(cols) * (len(cols) - 1))
+
+    observed = inside(columns)
+    null = []
+    for _ in range(draws):
+        picked = [int(rng.choice(pools[bins[c]])) for c in columns]
+        if len(set(picked)) == len(picked):
+            null.append(inside(picked))
+    if len(null) < 20 or np.std(null) == 0:
+        return None
+    return round(float((observed - np.mean(null)) / np.std(null)), 2)
+
+
+def compute_sca(
+    rows: list[str],
+    trials: int = TRIALS,
+    seed: int = 1,
+    mask: list[bool] | None = None,
+    components: int | None = None,
+) -> dict:
     """
     Secteurs SCA d'un alignement ancré (la première ligne est la référence,
-    positions numérotées à partir de 1).
+    positions numérotées à partir de 1). `mask` : colonnes peu fiables exclues.
+    `components` : nombre de composantes imposé (tests de robustesse : pas
+    d'alignements aléatoires à recalculer).
     """
     codes = encode(rows)
     n, length = codes.shape
@@ -123,11 +173,15 @@ def compute_sca(rows: list[str], trials: int = TRIALS, seed: int = 1) -> dict:
     weights = sequence_weights(codes, IDENTITY_THRESHOLD)
     gap_fraction = ((codes == GAP) * weights[:, None]).sum(axis=0) / weights.sum()
     valid = gap_fraction <= MAX_GAP_FRACTION
+    if mask is not None:
+        valid &= ~np.asarray(mask, dtype=bool)
     idx = np.flatnonzero(valid)
     if len(idx) < 10:
         raise ValueError("Trop de positions avec des gaps pour une analyse SCA.")
 
-    matrix = sca_matrix(_onehot(codes[:, idx]), weights)
+    onehot = _onehot(codes[:, idx])
+    matrix = sca_matrix(onehot, weights)
+    conservation = positional_conservation(onehot, weights)
     eigenvalues, eigenvectors = np.linalg.eigh(matrix)
     order = np.argsort(eigenvalues)[::-1]
     eigenvalues, eigenvectors = eigenvalues[order], eigenvectors[:, order]
@@ -136,15 +190,15 @@ def compute_sca(rows: list[str], trials: int = TRIALS, seed: int = 1) -> dict:
     # reflète surtout la conservation), moyenne + 3 écarts-types (pySCA)
     rng = np.random.default_rng(seed)
     random_second = []
-    trials = max(1, trials if len(idx) <= 800 else min(trials, 3))
+    trials = 0 if components else max(1, trials if len(idx) <= 800 else min(trials, 3))
     for _ in range(trials):
         random = random_alignment(codes[:, idx], weights, rng)
         # Mêmes poids que l'alignement réel : même nombre effectif de séquences, donc même bruit
         values = np.linalg.eigvalsh(sca_matrix(_onehot(random), weights))
         random_second.append(np.sort(values)[-2])
-    threshold = float(np.mean(random_second) + 3 * np.std(random_second))
-    significant = int(np.sum(eigenvalues > threshold))
-    k = int(min(MAX_COMPONENTS, max(1, significant)))
+    threshold = float(np.mean(random_second) + 3 * np.std(random_second)) if random_second else None
+    significant = int(np.sum(eigenvalues > threshold)) if threshold is not None else None
+    k = int(components) if components else int(min(MAX_COMPONENTS, max(1, significant)))
 
     components = independent_components(eigenvectors[:, :k], seed=seed)
     z_scores = []
@@ -169,11 +223,17 @@ def compute_sca(rows: list[str], trials: int = TRIALS, seed: int = 1) -> dict:
         if len(columns) < MIN_SECTOR_SIZE:
             continue
         columns.sort(key=lambda c: -z_scores[comp, c])
+        sector_conservation = conservation[columns]
         sectors.append(
             {
                 "component": comp + 1,
                 "positions": sorted(int(idx[c]) + 1 for c in columns),
                 "weights": {int(idx[c]) + 1: round(float(z_scores[comp, c]), 2) for c in columns},
+                # Conservation contre covariance collective
+                "mean_conservation": round(float(sector_conservation.mean()), 3),
+                "conservation_percentile": round(float((conservation < sector_conservation.mean()).mean()), 2),
+                "loading_conservation_r": _spearman(components[:, comp], conservation),
+                "covariance_z": conservation_matched_z(matrix, conservation, columns, seed=seed),
             }
         )
     for number, sector in enumerate(sectors, start=1):
@@ -185,8 +245,26 @@ def compute_sca(rows: list[str], trials: int = TRIALS, seed: int = 1) -> dict:
         "neff": round(float(weights.sum()), 1),
         "valid_columns": int(len(idx)),
         "eigenvalues": [round(float(v), 3) for v in eigenvalues[:20]],
-        "random_threshold": round(threshold, 3),
+        "random_threshold": round(threshold, 3) if threshold is not None else None,
         "significant_modes": significant,
         "components": k,
         "sectors": sectors,
+        "parameters": {
+            "identity_threshold": IDENTITY_THRESHOLD,
+            "pseudocount": PSEUDOCOUNT,
+            "max_gap_fraction": MAX_GAP_FRACTION,
+            "random_trials": trials,
+            "max_components": MAX_COMPONENTS,
+            "sector_z": SECTOR_Z,
+            "min_sector_size": MIN_SECTOR_SIZE,
+            "masked_columns": int(np.sum(mask)) if mask is not None else 0,
+        },
+        # Le premier mode propre reflète surtout la conservation globale (Rivoire et al., 2016)
+        "first_mode_conservation_r": _spearman(np.abs(eigenvectors[:, 0]), conservation),
+        "loading_histograms": [_histogram(z_scores[c]) for c in range(k)],
     }
+
+
+def _histogram(values: np.ndarray) -> dict:
+    counts, edges = np.histogram(np.clip(values, -4, 10), bins=28, range=(-4, 10))
+    return {"edges": [round(float(e), 1) for e in edges], "counts": counts.tolist()}

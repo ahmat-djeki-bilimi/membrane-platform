@@ -134,3 +134,46 @@ def test_choose_rank():
     assert ps.choose_rank(lineages) == ("order", "Ordre")
     assert ps.choose_rank([{"domain": "Bacteria"}]) == ("domain", "Domaine")
     assert ps.choose_rank([None]) is None
+
+
+# ---------------------------------------------------------------------------
+# Modèles, diagnostic et arbre sur une sélection (Explorateur)
+# ---------------------------------------------------------------------------
+
+def test_distance_models_order():
+    rows = ["ACDEFGHIKLMNPQRSTVWY" * 2, "ACDEFGHIKLMNPQRSTVWY" + "WYACDEFGHIKLMNPQRSTV"]
+    onehot, present = ps._encode(rows)
+    p = ps.kimura_distances(onehot, present, model="p")[0, 1]
+    poisson = ps.kimura_distances(onehot, present, model="poisson")[0, 1]
+    kimura = ps.kimura_distances(onehot, present, model="kimura")[0, 1]
+    assert abs(p - 0.5) < 1e-6
+    assert p < poisson < kimura
+
+
+def test_informative_sites():
+    assert ps.informative_sites(["AA", "AC", "CA", "CC"]) == 2
+    assert ps.informative_sites(["AA", "AA", "AC", "CA"]) == 0
+
+
+def test_interpretation_limits():
+    good = {"informative_sites": 200, "saturated_fraction": 0, "mean_overlap": 0.95, "strong_fraction": 0.8, "median_identity": 0.5}
+    assert ps.interpretation_limits(30, 100, good) == ("correcte", [])
+    level, limits = ps.interpretation_limits(5, 100, {**good, "informative_sites": 10, "strong_fraction": 0.05})
+    assert level == "insuffisante" and len(limits) == 3
+    assert ps.interpretation_limits(30, 100, {**good, "median_identity": 0.95})[0] == "prudence"
+
+
+def test_build_tree_reports_method_and_mask(monkeypatch):
+    monkeypatch.setattr(ps, "fetch_lineages", lambda ids: {})
+    rng = random.Random(4)
+    base = "".join(rng.choice("ACDEFGHIKLMNPQRSTVWY") for _ in range(80))
+    rows = ["".join(c if rng.random() > 0.2 else rng.choice("ACDEFGHIKLMNPQRSTVWY") for c in base) for _ in range(9)]
+    msa = [{"accession": f"h{k}", "row": r} for k, r in enumerate(rows)]
+    homologs = [{"accession": f"h{k}", "identity": 0.8} for k in range(9)]
+    mask = [k < 20 for k in range(80)]
+    tree = ps.build_tree(base, {"id": "ref"}, msa, homologs, replicates=10, model="poisson", mask=mask)
+    assert tree["model"]["id"] == "poisson" and "Poisson" in tree["method"]
+    assert tree["diagnostics"]["columns"] == 60 and tree["diagnostics"]["masked_columns"] == 20
+    assert tree["reliability"] in ("correcte", "prudence", "insuffisante")
+    assert tree["support"]["replicates"] == 10
+    assert tree["leaf_count"] == 10

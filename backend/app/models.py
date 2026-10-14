@@ -30,15 +30,25 @@ class Job(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Traçabilité de la dernière exécution : étapes, sources et versions, entrées, outils, environnement
+    provenance: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Tentatives précédentes (reprises) : erreur, dates et traçabilité de chacune
+    history: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # Nouvelle exécution d'une tâche existante (comparaison de deux exécutions)
+    parent_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
 
-    def to_dict(self) -> dict:
+    def to_dict(self, with_result: bool = True) -> dict:
         return {
             "id": self.id,
             "kind": self.kind,
             "status": self.status,
             "params": self.params,
-            "result": self.result,
+            "result": self.result if with_result else None,
             "error": self.error,
+            "attempts": self.attempts,
+            "provenance": self.provenance,
+            "history": self.history or [],
+            "parent_id": self.parent_id,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "started_at": self.started_at.isoformat() if self.started_at else None,
             "finished_at": self.finished_at.isoformat() if self.finished_at else None,

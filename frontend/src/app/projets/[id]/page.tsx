@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowRight, Boxes, ChevronRight, Dna, FileText, Loader2, Pencil, Trash2 } from "lucide-react";
+import { ArrowRight, Boxes, ChevronRight, Dna, FileText, History, Loader2, Pencil, Trash2 } from "lucide-react";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import RequireAuth from "@/components/RequireAuth";
@@ -17,6 +17,7 @@ const KIND = {
   accession: { label: "Analyse de séquence", icon: <Dna size={16} />, color: "bg-blue-600" },
   sequence: { label: "Séquence utilisateur", icon: <FileText size={16} />, color: "bg-rose-500" },
   structure: { label: "Structure", icon: <Boxes size={16} />, color: "bg-violet-600" },
+  run: { label: "Exécution d’analyse", icon: <History size={16} />, color: "bg-emerald-600" },
 } as const;
 
 export default function ProjectPage() {
@@ -74,7 +75,8 @@ function ProjectContent() {
 
   const open = (analysis: SavedAnalysis) => {
     const payload = analysis.payload as Record<string, string>;
-    if (analysis.kind === "accession") router.push(`/search?q=${payload.accession}`);
+    if (analysis.kind === "run") router.push(`/analyses/${payload.job_id}`);
+    else if (analysis.kind === "accession") router.push(`/search?q=${payload.accession}`);
     else if (analysis.kind === "structure")
       router.push(`/structures/${payload.accession}${payload.pdb_id ? `?pdb=${payload.pdb_id}` : ""}`);
     else {
@@ -195,7 +197,7 @@ function ProjectContent() {
         {analyses.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-[15px] text-slate-600">
             Aucune analyse. Utilisez le bouton « Enregistrer dans un projet » sur les pages
-            Recherche et Structures.
+            Recherche, Structures et Analyses.
           </div>
         ) : (
           <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -212,7 +214,7 @@ function ProjectContent() {
                         {a.title}
                       </p>
                       <p className="font-mono text-[13px] text-slate-500">
-                        {[payload.accession, payload.pdb_id, payload.length ? `${payload.length} aa` : null]
+                        {[payload.accession, payload.pdb_id, payload.length ? `${payload.length} aa` : null, payload.job_id ? `exécution ${String(payload.job_id).slice(0, 8)}` : null]
                           .filter(Boolean)
                           .join(" · ")}
                       </p>

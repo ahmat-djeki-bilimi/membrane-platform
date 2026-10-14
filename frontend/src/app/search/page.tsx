@@ -47,6 +47,7 @@ import {
 import { API_BASE } from "../../lib/api";
 import { HERO_BG, HERO_GLOW, TONES, type Tone } from "../../lib/theme";
 import { isValidAccession, normalizeAccession } from "../../lib/uniprot";
+import FunctionalAnnotation from "../../components/FunctionalAnnotation";
 import {
   AA_CLASSES,
   MOTIF_PRESETS,
@@ -665,6 +666,8 @@ function SearchContent() {
                 </p>
               </Panel>
             </div>
+
+            {mode === "accession" && uniprot?.accession && <FunctionalAnnotation accession={uniprot.accession} />}
 
             <Panel
               id="topologie"

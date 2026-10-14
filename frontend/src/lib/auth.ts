@@ -8,7 +8,7 @@ export type User = { id: string; email: string; name: string; created_at: string
 
 export type SavedAnalysis = {
   id: string;
-  kind: "accession" | "sequence" | "structure";
+  kind: "accession" | "sequence" | "structure" | "run";
   title: string;
   payload: Record<string, unknown>;
   notes: string;

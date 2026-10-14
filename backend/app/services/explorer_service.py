@@ -23,9 +23,13 @@ from collections import Counter
 
 import numpy as np
 
-from app import jobs
+from app import jobs, provenance
+from app.cache import cached
 from app.services import uniprot_service
 from app.services.alignment import align_to_query, anchored_score, significance
+from app.services.alignment_qc_service import quality_control
+from app.services.coevolution_robustness_service import alignment_diagnostics, contact_benchmark, mip_robustness, sca_stability
+from app.services.topology_comparison_service import compare_topologies, orientation_report, structure_segments, uniprot_segments
 from app.services.coevolution_service import MAX_LENGTH as COEVOLUTION_MAX_LENGTH, compute_coevolution
 from app.services.conservation_service import (
     analyze_alignment,
@@ -38,15 +42,17 @@ from app.services.conservation_service import (
     _is_swissprot,
     _mmseqs_alignment,
 )
-from app.services.homology_service import find_identical_entry
+from app.services.homology_service import fetch_uniref_organisms, find_identical_entry
 from app.services.membrane_orientation_service import estimate_tm_segments
-from app.services.phylogeny_service import build_tree
+from app.services.phylogeny_service import build_tree, fetch_lineages
 from app.services.sca_service import compute_sca
 
 # À incrémenter quand la méthode change : les anciens résultats sont recalculés
-METHOD_VERSION = 5
+METHOD_VERSION = 10
 MIN_SEQUENCES = 2
 MAX_SEQUENCES = 500
+# Homologues que l'utilisateur peut demander de conserver (fichier + MMseqs2)
+MAX_KEEP = 2000
 MIN_REFERENCE_LENGTH = 20
 MAX_REFERENCE_LENGTH = 1500
 MIN_COVERAGE = 0.5
@@ -54,6 +60,8 @@ MIN_IDENTITY = 0.2
 MIN_RELIABLE = 10
 # Arbre : les homologues les plus proches (l'arbre de 1 000 feuilles serait illisible et lent)
 MAX_TREE_SEQUENCES = 100
+# Arbre construit sur des séquences choisies par l'utilisateur
+MAX_TREE_SELECTION = 200
 # Paires fortes : réseaux et positions couplées
 STRONG_PAIR_Z = 3.0
 # Poids de la coévolution dans le classement des candidates, selon la profondeur de l'alignement
@@ -234,6 +242,8 @@ def build_alignment(records: list[dict], reference: int, allow_empty: bool = Fal
         "homologs": [homologs[k] for k in order],
         "excluded": excluded,
         "prealigned": prealigned,
+        # Alignement fourni : colonne du fichier (à partir de 1) de chaque résidu de la référence
+        "columns": [k + 1 for k in columns] if prealigned else None,
     }
 
 
@@ -292,11 +302,19 @@ def reference_topology(sequence: str, entry: dict | None, name: str) -> dict:
     """Segments TM et régions de la référence, avec leur source."""
     from app.services.membrane_service import deeptmhmm_enabled
 
-    deeptmhmm_status = None
+    deeptmhmm_status, deeptmhmm = None, None
     if deeptmhmm_enabled():
         job = jobs.submit("deeptmhmm", {"sequence": sequence, "name": name}, key_params={"sequence": sequence})
         deeptmhmm_status = job["status"]
         result = job.get("result") or {}
+        if job["status"] == "succeeded":
+            # Prédiction gardée pour la comparaison des sources, même si elle n'est pas retenue
+            deeptmhmm = {
+                "segments": [{"start": s["start"], "end": s["end"], "label": s["label"]} for s in result.get("tm_segments") or []],
+                "n_terminus": result.get("n_terminus"),
+                "predicted_type": result.get("predicted_type"),
+                "is_membrane": result.get("is_membrane"),
+            }
         if job["status"] == "succeeded" and result.get("tm_segments"):
             segments = [{"start": s["start"], "end": s["end"], "label": s["label"]} for s in result["tm_segments"]]
             return {
@@ -307,6 +325,7 @@ def reference_topology(sequence: str, entry: dict | None, name: str) -> dict:
                 "predicted_type": result.get("predicted_type"),
                 "signal_peptide": result.get("signal_peptide"),
                 "deeptmhmm_status": deeptmhmm_status,
+                "deeptmhmm": deeptmhmm,
             }
 
     if entry is not None:
@@ -321,6 +340,7 @@ def reference_topology(sequence: str, entry: dict | None, name: str) -> dict:
                 "predicted_type": None,
                 "signal_peptide": None,
                 "deeptmhmm_status": deeptmhmm_status,
+                "deeptmhmm": deeptmhmm,
             }
 
     segments = [{"start": s["start"], "end": s["end"], "label": s["label"]} for s in estimate_tm_segments(sequence)]
@@ -332,7 +352,47 @@ def reference_topology(sequence: str, entry: dict | None, name: str) -> dict:
         "predicted_type": None,
         "signal_peptide": None,
         "deeptmhmm_status": deeptmhmm_status,
+        "deeptmhmm": deeptmhmm,
     }
+
+
+def compare_reference_topology(
+    sequence: str,
+    entry: dict | None,
+    topology: dict,
+    structure: dict | None,
+    features: dict | None,
+    opm: dict | None,
+) -> tuple[dict, dict]:
+    """Confronte DeepTMHMM, UniProt, la structure 3D et l'hydropathie ; limites de l'orientation calculée."""
+    sources: dict[str, dict] = {}
+    deeptmhmm = topology.get("deeptmhmm")
+    if deeptmhmm:
+        sources["deeptmhmm"] = {**deeptmhmm, "note": deeptmhmm.get("predicted_type")}
+    if entry is not None:
+        segments = uniprot_segments(entry)
+        sources["uniprot"] = {
+            "segments": segments,
+            "n_terminus": uniprot_service.n_terminus_side(entry),
+            "note": "Aucun segment annoté" if not segments else None,
+        }
+    membrane = (structure or {}).get("membrane")
+    if structure and membrane and features:
+        sources["structure"] = {
+            "segments": structure_segments(features["residues"], membrane["thickness"] / 2),
+            # Côté repris de la topologie ou de la règle positive-inside : pas une observation indépendante
+            "n_terminus": membrane["n_terminus"] if membrane.get("side_method") != "topology" else None,
+            "note": f"Modèle {structure['source']}, tranche de {membrane['thickness']} Å",
+        }
+    sources["kd"] = {
+        "segments": [{"start": s["start"], "end": s["end"], "label": s["label"]} for s in estimate_tm_segments(sequence)],
+        "n_terminus": None,
+        "note": "Fenêtre de 19 résidus, seuil 1,6",
+    }
+    labels = {"deeptmhmm": "DeepTMHMM", "uniprot": "UniProt", "kd": "estimées par hydropathie", "user": "fournis"}
+    comparison = compare_topologies(len(sequence), sources, topology["source"], topology["segments"], (structure or {}).get("helices"))
+    orientation = orientation_report(structure, topology["source"], labels.get(topology["source"], topology["source"]), opm)
+    return comparison, orientation
 
 
 # ---------------------------------------------------------------------------
@@ -635,7 +695,7 @@ def gxxxg_positions(sequence: str, positions: list[dict], regions: list[dict]) -
         for p in range(region["start"], region["end"] - 3):
             q = p + 4
             if sequence[p - 1] in SMALL and sequence[q - 1] in SMALL and "G" in (sequence[p - 1], sequence[q - 1]):
-                if positions[p - 1]["grade"] >= 7 and positions[q - 1]["grade"] >= 7:
+                if all(positions[k - 1]["grade"] >= 7 and not positions[k - 1].get("masked") for k in (p, q)):
                     found.update((p, q))
     return found
 
@@ -655,7 +715,7 @@ def score_candidates(
         number, aa, grade = p["position"], p["residue"], p["grade"]
         couplings = degree.get(number, 0) if coupling_weight > 0 else 0
         in_sector = bool(p.get("sector")) and coupling_weight > 0
-        if p["gap_fraction"] > 0.3 or (grade < 7 and not ((couplings >= 2 or in_sector) and grade >= 5)):
+        if p.get("masked") or p["gap_fraction"] > 0.3 or (grade < 7 and not ((couplings >= 2 or in_sector) and grade >= 5)):
             continue
         zone = p.get("zone")
         in_membrane = zone in ("core", "membrane")
@@ -749,6 +809,19 @@ def interpret(result: dict) -> list[dict]:
             }
         )
 
+    quality = result.get("qc")
+    if quality:
+        q, d = quality["summary"], quality["diversity"]
+        text = (
+            f"{_pct(q['mean_gap'])} de gaps en moyenne, couverture médiane {_pct(q['median_coverage'])}, "
+            f"Neff = {d['neff']} ({d['neff_per_length']} par position)."
+        )
+        if q["removed"] or q["masked_columns"]:
+            text += f" {q['removed']} séquence(s) incomplète(s) écartée(s) et {q['masked_columns']} colonne(s) masquée(s) ; les positions gardent leur numéro."
+        if quality["poor_regions"]:
+            text += f" {len(quality['poor_regions'])} région(s) mal alignée(s) : leurs grades sont à lire avec prudence."
+        notes.append({"topic": "quality", "title": "Qualité de l’alignement", "text": text})
+
     s = result["summary"]
     if s["tm_mean_score"] is not None and s["loop_mean_score"] is not None:
         diff = s["tm_mean_score"] - s["loop_mean_score"]
@@ -792,6 +865,12 @@ def interpret(result: dict) -> list[dict]:
             )
         if reliability["level"] in ("insuffisante", "faible"):
             text += " " + reliability["text"]
+        robustness = coevolution.get("robustness") or {}
+        if robustness.get("above_null") is not None:
+            text += (
+                f" Robustesse : {robustness['above_null']} des {robustness['top_count']} premières paires dépassent le hasard "
+                f"(alignements mélangés), {robustness['stable_pairs']} sont retrouvées dans au moins 75 % des sous-échantillons."
+            )
         inter = sum(1 for p in coevolution["pairs"][: coevolution["length"] // 5] if p["kind"] == "inter_helix")
         if inter:
             text += f" {inter} des premières paires relient deux hélices différentes : candidates pour l’empilement des hélices."
@@ -824,22 +903,43 @@ def interpret(result: dict) -> list[dict]:
             text += f" {len(comparison['shared'])} résidu(s) sont désignés à la fois par la MIp et par la SCA : les candidats les plus solides."
         notes.append({"topic": "sca", "title": "Secteurs SCA", "text": text})
 
-    structure, opm = result.get("structure"), result.get("opm")
-    if structure and structure.get("membrane") and opm and opm.get("hydrophobic_thickness"):
+    topology = result.get("topology_comparison")
+    if topology and topology["divergences"]:
+        s = topology["summary"]
         notes.append(
             {
-                "topic": "orientation",
-                "title": "Orientation membranaire",
-                "text": f"Épaisseur hydrophobe estimée sur le modèle {structure['source']} : {structure['membrane']['thickness']} Å ; "
-                f"OPM ({opm['pdb_id']}) : {opm['hydrophobic_thickness']} Å.",
+                "topic": "topology",
+                "title": "Topologie",
+                "text": f"{s['strong']} segment(s) sur {s['segments']} sont confirmés par plusieurs sources ; "
+                f"{s['major_divergences']} divergence(s) majeure(s) entre DeepTMHMM, UniProt et la structure : "
+                + topology["divergences"][0]["text"],
             }
         )
+
+    structure, opm = result.get("structure"), result.get("opm")
+    if structure and structure.get("membrane"):
+        text = (
+            f"Orientation calculée (non expérimentale) sur le modèle {structure['source']} : bicouche de "
+            f"{structure['membrane']['thickness']} Å"
+        )
+        if opm and opm.get("hydrophobic_thickness"):
+            text += f" ; OPM ({opm['pdb_id']}, calculée sur une structure expérimentale) : {opm['hydrophobic_thickness']} Å"
+        notes.append({"topic": "orientation", "title": "Orientation membranaire", "text": text + "."})
     return notes
 
 
 # ---------------------------------------------------------------------------
 # Point d'entrée
 # ---------------------------------------------------------------------------
+
+@cached("explorer:mmseqs", ttl=30 * 24 * 3600)
+def _mmseqs_cached(query: str) -> list:
+    """
+    Recherche MMseqs2 mise en cache : une analyse relancée sur une sélection
+    d'homologues retrouve les mêmes séquences, sans nouvelle recherche.
+    """
+    return list(_mmseqs_alignment(query))
+
 
 def add_mmseqs_homologs(alignment: dict, reference_accession: str | None = None) -> int:
     """
@@ -849,7 +949,7 @@ def add_mmseqs_homologs(alignment: dict, reference_accession: str | None = None)
     importées, pour que toutes les lignes soient comparables.
     """
     query = alignment["query"]
-    rows, homologs, _ = _mmseqs_alignment(query)
+    rows, homologs, _ = _mmseqs_cached(query)
     known = set(alignment["rows"])
     known_entries = {h.get("uniprot_accession") for h in alignment["homologs"]} | {reference_accession}
     added = 0
@@ -871,7 +971,63 @@ def add_mmseqs_homologs(alignment: dict, reference_accession: str | None = None)
     return added
 
 
-def run_explorer(fasta: str, reference: int = 0, accession: str | None = None, expand: bool = False) -> dict:
+def complete_organisms(homologs: list[dict]) -> None:
+    """Organisme des homologues MMseqs2 qui n'en ont pas encore (au-delà des premiers affichés)."""
+    missing = [h["accession"] for h in homologs if h.get("source") == "mmseqs" and not h.get("organism")]
+    if not missing:
+        return
+    try:
+        found = fetch_uniref_organisms(missing)
+    except Exception:
+        return
+    for h in homologs:
+        info = found.get(h["accession"])
+        if info and not h.get("organism"):
+            h["organism"] = info.get("organism")
+            h["taxon_id"] = h.get("taxon_id") or info.get("taxon_id")
+            h["protein_name"] = h.get("protein_name") or info.get("name")
+
+
+def add_lineages(homologs: list[dict]) -> dict[int, dict[str, str]]:
+    """Lignée taxonomique (domaine … famille) de chaque homologue : diversité de la famille."""
+    try:
+        lineages = fetch_lineages([h.get("taxon_id") for h in homologs])
+    except Exception:
+        lineages = {}
+    for h in homologs:
+        h["lineage"] = lineages.get(h.get("taxon_id")) or {}
+    return lineages
+
+
+def select_homologs(alignment: dict, keep: list[str]) -> tuple[list[dict], int]:
+    """
+    Ne garde dans l'alignement que les homologues choisis par l'utilisateur.
+    Les autres sont renvoyés avec leur ligne alignée, pour pouvoir être
+    réintégrés ; renvoie aussi le nombre d'identifiants demandés introuvables.
+    """
+    wanted = set(keep)
+    rows, homologs, unselected = [], [], []
+    for row, homolog in zip(alignment["rows"], alignment["homologs"]):
+        if homolog["accession"] in wanted:
+            rows.append(row)
+            homologs.append(homolog)
+        else:
+            unselected.append({**homolog, "row": row})
+    if not rows:
+        raise ExplorerError("Aucun des homologues sélectionnés n'a été retrouvé : choisissez-en au moins un.")
+    alignment["rows"], alignment["homologs"] = rows, homologs
+    return unselected, len(wanted - {h["accession"] for h in homologs})
+
+
+def run_explorer(
+    fasta: str,
+    reference: int = 0,
+    accession: str | None = None,
+    expand: bool = False,
+    keep: list[str] | None = None,
+    qc: dict | None = None,
+) -> dict:
+    provenance.mark("Lecture du FASTA et alignement sur la référence")
     records = parse_fasta(fasta)
     validate(records, reference, expand)
     ref = records[reference]
@@ -879,10 +1035,31 @@ def run_explorer(fasta: str, reference: int = 0, accession: str | None = None, e
     query = alignment["query"]
     warnings = []
     imported = len(alignment["rows"])
+    if expand:
+        provenance.mark("Recherche d’homologues MMseqs2 (UniRef)")
     added = add_mmseqs_homologs(alignment, accession or ref["accession"]) if expand else 0
     if not alignment["rows"]:
         raise ExplorerError("Aucun homologue retenu : importez des séquences ou réessayez la recherche étendue.")
+    if expand:
+        complete_organisms(alignment["homologs"])
+    lineages = add_lineages(alignment["homologs"])
+    # Sélection de l'utilisateur : les autres homologues restent proposés dans l'onglet Homologues
+    pool = len(alignment["rows"])
+    unselected, missing = select_homologs(alignment, keep) if keep is not None else ([], 0)
+    if missing:
+        warnings.append(f"{missing} homologue(s) de la sélection n'ont pas été retrouvés (recherche MMseqs2 actualisée).")
 
+    # Contrôle qualité : séquences incomplètes écartées, colonnes peu fiables masquées (numérotation inchangée)
+    provenance.mark("Sélection des homologues et contrôle qualité de l’alignement")
+    rows, homologs, quality = quality_control(query, alignment["rows"], alignment["homologs"], qc, alignment.get("columns"))
+    if not rows:
+        raise ExplorerError("Le contrôle qualité écarte tous les homologues : assouplissez les filtres de séquences.")
+    alignment["rows"], alignment["homologs"] = rows, homologs
+    mask = quality["columns"]["masked"]
+    if sum(mask) > 0.8 * len(query):
+        raise ExplorerError("Le contrôle qualité masque plus de 80 % des colonnes : assouplissez les filtres de colonnes.")
+
+    provenance.mark("Identification UniProt et topologie de la référence")
     identity = identify_reference(ref, accession)
     entry = identity["entry"]
     if identity["mismatch"]:
@@ -895,7 +1072,8 @@ def run_explorer(fasta: str, reference: int = 0, accession: str | None = None, e
     if topology["deeptmhmm_status"] in ("queued", "running"):
         warnings.append("DeepTMHMM est en cours sur la référence : relancez l'analyse plus tard pour utiliser sa topologie.")
 
-    result = analyze_alignment(query, alignment["rows"], alignment["homologs"], topology["regions"], topology["segments"])
+    provenance.mark("Conservation (Jensen-Shannon)")
+    result = analyze_alignment(query, alignment["rows"], alignment["homologs"], topology["regions"], topology["segments"], mask=mask)
     result["warnings"] = result["warnings"] + warnings
     # Alignement et homologues complets (et pas seulement les premiers)
     result["homologs"] = alignment["homologs"]
@@ -905,6 +1083,7 @@ def run_explorer(fasta: str, reference: int = 0, accession: str | None = None, e
     ]
     positions = result["positions"]
 
+    provenance.mark("Arbre phylogénétique")
     # Arbre phylogénétique de la référence et des homologues les plus proches
     try:
         result["tree"] = build_tree(
@@ -912,11 +1091,14 @@ def run_explorer(fasta: str, reference: int = 0, accession: str | None = None, e
             {"id": uniprot_accession or ref["id"], "organism": ref["organism"], "taxon_id": ref["taxon_id"]},
             result["msa"][:MAX_TREE_SEQUENCES],
             alignment["homologs"],
+            lineages=lineages,
+            mask=mask,
         )
     except Exception as error:  # l'arbre ne doit pas faire échouer l'analyse
         result["tree"] = None
         result["warnings"].append(f"Arbre phylogénétique indisponible : {error}"[:300])
 
+    provenance.mark("Structure 3D placée dans la membrane (AlphaFold ou ESMFold)")
     # Structure placée dans la membrane
     structure, features = None, None
     try:
@@ -941,12 +1123,23 @@ def run_explorer(fasta: str, reference: int = 0, accession: str | None = None, e
     except Exception as error:  # la structure ne doit pas faire échouer l'analyse
         result["warnings"].append(f"Structure 3D indisponible : {error}"[:300])
 
+    provenance.mark("Orientation OPM et comparaison des topologies")
     opm = None
     if uniprot_accession:
         try:
             opm = find_opm(uniprot_accession, len(query))
         except Exception:
             opm = None
+
+    # Entrées réellement utilisées (traçabilité)
+    if uniprot_accession:
+        provenance.record_input("Entrée UniProt de la référence", uniprot_accession, origin=identity["origin"])
+    if structure:
+        provenance.record_input("Modèle 3D", structure.get("model_id") or structure["source"], source=structure["source"])
+    if opm and opm.get("pdb_id"):
+        provenance.record_input("Structure PDB (orientation OPM)", opm["pdb_id"])
+
+    topology_comparison, orientation = compare_reference_topology(query, entry, topology, structure, features, opm)
 
     # Cartographie de chaque position
     tm_positions = {k for s in topology["segments"] for k in range(s["start"], s["end"] + 1)}
@@ -964,19 +1157,32 @@ def run_explorer(fasta: str, reference: int = 0, accession: str | None = None, e
             if info:
                 p.update({k: info[k] for k in ("neighbours", "burial", "plddt")})
 
+    provenance.mark("Coévolution (MIp) et contrôles de robustesse")
     # Coévolution
     coevolution = None
     if len(query) <= COEVOLUTION_MAX_LENGTH:
         try:
-            coevolution = compute_coevolution([query] + alignment["rows"])
+            coevolution = compute_coevolution([query] + alignment["rows"], mask=mask)
             annotate_pairs(coevolution, topology["regions"], features)
         except ValueError as error:
             result["warnings"].append(f"Coévolution non calculée : {error}")
+    if coevolution:
+        # Contrôles : alignement, robustesse des paires, comparaison aux contacts du modèle
+        try:
+            rows = [query] + alignment["rows"]
+            coevolution["diagnostics"] = alignment_diagnostics(rows, mask, alignment["homologs"])
+            coevolution["robustness"] = mip_robustness(rows, coevolution, mask)
+            coevolution["benchmark"] = contact_benchmark(coevolution, structure)
+        except Exception as error:  # les contrôles ne doivent pas faire échouer l'analyse
+            result["warnings"].append(f"Contrôles de la coévolution incomplets : {error}"[:300])
     degree: Counter = Counter()
     networks, top = [], []
     if coevolution:
-        # Paires fortes : parmi les L/5 premières, nettement au-dessus du bruit
-        top = [p for p in coevolution["pairs"][: max(len(query) // 5, 1)] if p["z"] >= STRONG_PAIR_Z]
+        # Paires fortes : parmi les L/5 premières, nettement au-dessus du bruit et des alignements mélangés
+        top = [
+            p for p in coevolution["pairs"][: max(len(query) // 5, 1)]
+            if p["z"] >= STRONG_PAIR_Z and p.get("above_null", True)
+        ]
         coevolution["strong_pairs"] = len(top)
         for pair in top:
             degree[pair["i"]] += 1
@@ -988,12 +1194,17 @@ def run_explorer(fasta: str, reference: int = 0, accession: str | None = None, e
     for p in positions:
         p["couplings"] = degree.get(p["position"], 0)
 
+    provenance.mark("Secteurs SCA et stabilité")
     # Secteurs SCA, cartographiés sur la structure et comparés aux réseaux MIp
     sca, comparison = None, None
     if len(query) <= COEVOLUTION_MAX_LENGTH:
         try:
-            sca = compute_sca([query] + alignment["rows"])
+            sca = compute_sca([query] + alignment["rows"], mask=mask)
             annotate_sectors(sca, positions, topology["regions"], features)
+            try:
+                sca["stability_test"] = sca_stability([query] + alignment["rows"], sca, mask)
+            except Exception as error:  # la stabilité ne doit pas faire échouer l'analyse
+                result["warnings"].append(f"Stabilité des secteurs SCA non évaluée : {error}"[:300])
             if coevolution:
                 sca["reliability"] = coevolution["reliability"]
                 comparison = compare_methods(positions, top, sca)
@@ -1022,8 +1233,15 @@ def run_explorer(fasta: str, reference: int = 0, accession: str | None = None, e
                 "expanded": expand,
                 "excluded": alignment["excluded"],
                 "prealigned": alignment["prealigned"],
+                # Homologues retenus avant la sélection de l'utilisateur
+                "pool": pool,
+                "selection": keep is not None,
             },
-            "topology": {k: v for k, v in topology.items() if k != "regions"},
+            "unselected": unselected,
+            "qc": quality,
+            "topology": {k: v for k, v in topology.items() if k not in ("regions", "deeptmhmm")},
+            "topology_comparison": topology_comparison,
+            "orientation": orientation,
             "structure": structure,
             "opm": opm,
             "coevolution": coevolution,
@@ -1040,14 +1258,54 @@ def run_explorer(fasta: str, reference: int = 0, accession: str | None = None, e
             ),
         }
     )
+    provenance.mark("Positions candidates et synthèse")
     result["most_variable"] = [
         {"position": p["position"], "residue": p["residue"], "score": p["score"]}
-        for p in sorted((p for p in positions if p["gap_fraction"] < 0.3), key=lambda p: p["score"])[:20]
+        for p in sorted((p for p in positions if p["gap_fraction"] < 0.3 and not p.get("masked")), key=lambda p: p["score"])[:20]
     ]
     if len(alignment["rows"]) < MIN_RELIABLE:
         result["warnings"].append("Moins de 10 homologues : ajoutez des séquences pour des résultats fiables.")
     result["interpretation"] = interpret(result)
     return result
+
+
+# ---------------------------------------------------------------------------
+# Arbre sur des séquences choisies (onglet Phylogénie)
+# ---------------------------------------------------------------------------
+
+def run_explorer_tree(job_id: str, ids: list[str], model: str = "kimura") -> dict:
+    """
+    Arbre de la référence et des homologues choisis, à partir de l'alignement
+    d'une analyse terminée (sans recalculer conservation, structure ni coévolution).
+    Les colonnes masquées par le contrôle qualité de cette analyse sont exclues.
+    """
+    parent = jobs.get(job_id)
+    if not parent or parent["kind"] != "explorer" or parent["status"] != "succeeded" or not parent["result"]:
+        raise ExplorerError("Analyse introuvable ou non terminée.")
+    result = parent["result"]
+    wanted = set(ids)
+    msa = [m for m in result["msa"] if m["accession"] in wanted]
+    if len(msa) < 3:
+        raise ExplorerError("Choisissez au moins 3 homologues de l'alignement pour construire un arbre.")
+    if len(msa) > MAX_TREE_SELECTION:
+        raise ExplorerError(f"Trop de séquences pour l'arbre ({len(msa)}) : {MAX_TREE_SELECTION} au maximum.")
+
+    reference = result["reference"]
+    previous = result.get("tree") or {}
+    query_leaf = next((leaf for leaf in previous.get("leaves", []) if leaf.get("is_query")), {})
+    lineages = {h["taxon_id"]: h["lineage"] for h in result["homologs"] if h.get("taxon_id") and h.get("lineage")}
+    if query_leaf.get("taxon_id") and query_leaf.get("lineage"):
+        lineages[query_leaf["taxon_id"]] = query_leaf["lineage"]
+    tree = build_tree(
+        result["query_sequence"],
+        {"id": reference.get("accession") or reference["id"], "organism": reference.get("organism"), "taxon_id": query_leaf.get("taxon_id")},
+        msa,
+        result["homologs"],
+        lineages=lineages,
+        model=model,
+        mask=((result.get("qc") or {}).get("columns") or {}).get("masked"),
+    )
+    return {"parent": job_id, "ids": sorted(m["accession"] for m in msa), "missing": len(wanted) - len(msa), "tree": tree}
 
 
 # ---------------------------------------------------------------------------

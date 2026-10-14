@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { API_BASE } from "./api";
+import { rememberRun } from "./runs";
 
 export type JobStatus = "idle" | "queued" | "running" | "succeeded" | "failed";
 
@@ -79,5 +80,7 @@ export function useJob<T, J extends Job<T> = Job<T>>(start: (() => Promise<J>) |
 export async function readJob(response: Response) {
   const data = await response.json();
   if (!response.ok) throw new Error(data.detail || `Erreur ${response.status}`);
+  // Historique « Mes analyses » : toute tâche lancée ou suivie depuis ce navigateur
+  if (data && typeof data.id === "string" && typeof data.status === "string") rememberRun(data.id, data.kind);
   return data;
 }

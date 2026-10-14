@@ -11,6 +11,7 @@ import { downloadText } from "@/lib/sequence";
 import ComparisonView from "./ComparisonView";
 import { LegendItem, type ResidueLink, type ResidueMark } from "./ExplorerViewer";
 import ScaView from "./ScaView";
+import { AlignmentChecks, MipControls } from "./CoevolutionControls";
 
 const ExplorerViewer = dynamic(() => import("./ExplorerViewer"), { ssr: false });
 
@@ -73,6 +74,7 @@ export default function CoevolutionTab({
           membrane → comparaison.
         </p>
       </section>
+      <AlignmentChecks diagnostics={result.coevolution?.diagnostics} />
       {method === "mip" && <MipView result={result} selected={selected} onSelect={onSelect} fileBase={fileBase} />}
       {method === "sca" && <ScaView result={result} selected={selected} onSelect={onSelect} onRerun={onRerun} />}
       {method === "comparison" && <ComparisonView result={result} selected={selected} onSelect={onSelect} onRerun={onRerun} />}
@@ -273,6 +275,8 @@ function MipView({
         </section>
       )}
 
+      <MipControls coevolution={coevolution} />
+
       <section className="rounded-lg border border-slate-200 bg-white">
         <h3 className="border-b border-slate-100 px-4 py-2.5 text-[16px] font-semibold text-slate-900">Paires de positions ({pairs.length})</h3>
         <div className="max-h-[420px] overflow-auto">
@@ -285,6 +289,12 @@ function MipView({
                 <th className="px-3 py-1.5 font-semibold">Type</th>
                 <th className="px-3 py-1.5 text-right font-semibold">z</th>
                 <th className="px-3 py-1.5 text-right font-semibold">Distance</th>
+                <th className="px-3 py-1.5 text-right font-semibold" title="Part des sous-échantillons (70 % des séquences) qui retrouvent la paire parmi les L/5 premières">
+                  Stabilité
+                </th>
+                <th className="px-3 py-1.5 font-semibold" title="Score supérieur au meilleur score obtenu sur les alignements mélangés">
+                  Au-dessus du hasard
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -311,6 +321,12 @@ function MipView({
                     <td className="px-3 py-1.5 text-right tabular-nums" style={{ color: pairColor(p) }}>
                       {p.distance != null ? `${p.distance} Å` : "—"}
                     </td>
+                    <td className={`px-3 py-1.5 text-right tabular-nums ${p.stability != null && p.stability < 0.5 ? "text-amber-700" : ""}`}>
+                      {p.stability != null ? pct(p.stability) : "—"}
+                    </td>
+                    <td className={`px-3 py-1.5 ${p.above_null === false ? "text-amber-700" : "text-slate-700"}`}>
+                      {p.above_null == null ? "—" : p.above_null ? "oui" : "non"}
+                    </td>
                   </tr>
                 );
               })}
@@ -320,7 +336,7 @@ function MipView({
         <p className="border-t border-slate-100 px-4 py-2 text-[13px] leading-5 text-slate-500">
           Méthode : {coevolution.method}. Séquences pondérées (identité ≥ 80 %), colonnes à plus de 50 % de gaps exclues,
           positions séparées d’au moins {coevolution.min_separation} résidus. z : écart du score à la moyenne de toutes
-          les paires, en écarts-types.
+          les paires, en écarts-types. Stabilité et « au-dessus du hasard » : voir les tests de robustesse ci-dessus.
         </p>
       </section>
     </div>

@@ -2,6 +2,7 @@
 
 from app import http
 from app.cache import cached
+from app.services.topology_comparison_service import EVIDENCE_LABELS, evidence_of
 
 UNIPROT_URL = "https://rest.uniprot.org/uniprotkb"
 
@@ -125,6 +126,7 @@ def domain_features(entry: dict) -> list[dict]:
         start, end = _location(feature)
         if not start or not end:
             continue
+        evidence = evidence_of(feature)
         domains.append(
             {
                 "start": start,
@@ -132,6 +134,10 @@ def domain_features(entry: dict) -> list[dict]:
                 "label": feature.get("description") or feature.get("type"),
                 "type": kind,
                 "feature_type": feature.get("type"),
+                # Nature de la preuve UniProt (expérimentale, similarité, prédiction…)
+                "evidence": evidence,
+                "evidence_label": EVIDENCE_LABELS[evidence],
+                "experimental": evidence in ("experimental", "structure"),
             }
         )
     domains.sort(key=lambda d: (d["start"], d["end"]))
