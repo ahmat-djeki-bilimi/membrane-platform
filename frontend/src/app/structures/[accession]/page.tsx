@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
+  ArrowLeftRight,
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
@@ -29,7 +30,7 @@ import {
 
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
-import { Alert, StatCard } from "@/components/ui";
+import { Alert, SegmentedControl, StatCard } from "@/components/ui";
 import StructuralDomains from "@/components/StructuralDomains";
 import AutoScientificInterpretation from "@/components/AutoScientificInterpretation";
 import ActiveSitePanel from "@/components/ActiveSitePanel";
@@ -43,6 +44,9 @@ import EvolutionPanel from "@/components/evolution/EvolutionPanel";
 import PredictedStructurePanel from "@/components/prediction/PredictedStructurePanel";
 import ComparisonPanel from "@/components/prediction/ComparisonPanel";
 import { mapRanges, type NumberedRange, type ResidueMapping } from "@/lib/mapping";
+import { toRanges } from "@/lib/modelAnalysis";
+import { ModelGeometryPanel, ModelSitesPanel } from "@/components/ModelAnalysisPanels";
+import MutationPanel from "@/components/MutationPanel";
 
 const Structure3DViewer = dynamic(() => import("@/components/Structure3DViewer"), {
   ssr: false,
@@ -143,6 +147,7 @@ type UniProtData = {
   organism?: string;
   gene_names?: string[];
   length?: number;
+  sequence?: string;
 };
 
 type RamaPoint = {
@@ -202,6 +207,7 @@ type TabKey =
   | "membrane"
   | "domains"
   | "active-site"
+  | "mutations"
   | "comparison"
   | "evolution"
   | "prediction"
@@ -213,6 +219,7 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
   { key: "membrane", label: "Membrane", icon: <Waves size={14} /> },
   { key: "domains", label: "Domaines", icon: <Dna size={14} /> },
   { key: "active-site", label: "Site actif", icon: <Crosshair size={14} /> },
+  { key: "mutations", label: "Mutations", icon: <ArrowLeftRight size={14} /> },
   { key: "comparison", label: "PDB / AlphaFold", icon: <GitCompare size={14} /> },
   { key: "evolution", label: "Évolution", icon: <GitBranch size={14} /> },
   { key: "prediction", label: "Structure prédite", icon: <Brain size={14} /> },
@@ -256,6 +263,8 @@ export default function StructurePage() {
   const [selectedPdb, setSelectedPdb] = useState<PDBStructure | null>(null);
   const [source, setSource] = useState<Source>("pdb");
   const [tab, setTab] = useState<TabKey>("overview");
+  // Onglet Site actif, quand les deux existent : structure expérimentale ou modèle AlphaFold
+  const [siteSource, setSiteSource] = useState<"pdb" | "model">("pdb");
 
   // Onglet demandé dans l'adresse (?tab=evolution…)
   useEffect(() => {
@@ -335,8 +344,12 @@ export default function StructurePage() {
     };
   }, [selectedPdb?.pdb_id, accession]);
 
+  // Résidus dispersés (poche, contact) surlignés dans le modèle AlphaFold
+  const [activeSet, setActiveSet] = useState<HighlightRange[]>([]);
+
   useEffect(() => {
     setActiveRange(null);
+    setActiveSet([]);
   }, [source, selectedPdb?.pdb_id]);
 
   const structures = useMemo(() => pdbData?.structures ?? [], [pdbData]);
@@ -372,10 +385,23 @@ export default function StructurePage() {
     [quality]
   );
 
+  const setFocusRange = (range: HighlightRange | null) => {
+    setActiveRange(range);
+    setActiveSet([]);
+  };
+
   const focus = (range: HighlightRange, target?: Source) => {
     if (target) setSource(target);
-    setActiveRange(range);
+    setFocusRange(range);
   };
+
+  // Analyse du modèle AlphaFold : résidus non contigus, numérotation UniProt (identique au modèle)
+  const focusModelResidues = (positions: number[], label: string, color: string) => {
+    if (!positions.length) return;
+    setActiveRange({ start: Math.min(...positions), end: Math.max(...positions), label, color });
+    setActiveSet(toRanges(positions).map((r) => ({ ...r, label, color })));
+  };
+  const hasAlphafold = !!alphafold?.available;
 
   const selectStructure = (structure: PDBStructure) => {
     setSelectedPdb(structure);
@@ -395,7 +421,8 @@ export default function StructurePage() {
           tmRanges={tmRanges}
           extraRanges={viewerSource === "pdb" ? qualityRanges : []}
           activeRange={activeRange}
-          setActiveRange={setActiveRange}
+          activeSet={activeSet}
+          setActiveRange={setFocusRange}
         />
       </div>
     </div>
@@ -475,7 +502,8 @@ export default function StructurePage() {
 
       <div className="sticky top-[var(--site-header-h,62px)] z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="flex w-full flex-col gap-2 px-4 py-2 lg:flex-row lg:items-center lg:justify-between lg:px-6">
-          <div role="tablist" className="-mx-1 flex gap-1 overflow-x-auto px-1">
+          {/* min-w-0 : la liste défile au lieu de passer sous le choix de la structure */}
+          <div role="tablist" className="-mx-1 flex min-w-0 gap-1 overflow-x-auto px-1 lg:flex-1">
             {TABS.map((t) => (
               <button
                 key={t.key}
@@ -494,7 +522,7 @@ export default function StructurePage() {
             ))}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
             <div className="inline-flex rounded-md bg-slate-100 p-0.5" role="radiogroup" aria-label="Source du modèle">
               {(
                 [
@@ -663,23 +691,57 @@ export default function StructurePage() {
                   alphafold={alphafold}
                   activeRange={activeRange}
                   onFocusRange={(r) => focus(r)}
-                  onClearFocus={() => setActiveRange(null)}
+                  onClearFocus={() => setFocusRange(null)}
                 />,
                 source
               )}
 
-            {tab === "active-site" &&
-              withViewer(
-                <ActiveSitePanel
-                  pdbId={selectedPdb?.pdb_id}
-                  activeRange={activeRange}
-                  onFocusRange={(r) => focus({ ...r, numbering: "pdb" })}
-                />,
-                "pdb"
-              )}
+            {tab === "active-site" && (
+              <div className="space-y-3">
+                {structures.length > 0 && hasAlphafold && (
+                  <SegmentedControl
+                    label="Structure analysée"
+                    value={siteSource}
+                    onChange={(v) => {
+                      setSiteSource(v);
+                      setFocusRange(null);
+                    }}
+                    options={[
+                      { value: "pdb", label: `Structure expérimentale (${selectedPdb?.pdb_id ?? "PDB"}) : ligands observés` },
+                      { value: "model", label: "Modèle AlphaFold : sites annotés et poches prédites" },
+                    ]}
+                  />
+                )}
+                {hasAlphafold && (structures.length === 0 || siteSource === "model")
+                  ? withViewer(<ModelSitesPanel accession={accession} onFocus={focusModelResidues} />, "alphafold")
+                  : withViewer(
+                      <ActiveSitePanel
+                        pdbId={selectedPdb?.pdb_id}
+                        activeRange={activeRange}
+                        onFocusRange={(r) => focus({ ...r, numbering: "pdb" })}
+                      />,
+                      "pdb"
+                    )}
+              </div>
+            )}
+
+            {tab === "mutations" &&
+              (uniprot?.sequence ? (
+                withViewer(
+                  <MutationPanel accession={accession} sequence={uniprot.sequence} onFocus={focusModelResidues} />,
+                  hasAlphafold ? "alphafold" : "pdb"
+                )
+              ) : (
+                <Alert tone="amber" title="Séquence indisponible">
+                  La séquence UniProt de cette entrée n’a pas pu être chargée : l’analyse des substitutions est impossible.
+                </Alert>
+              ))}
 
             {tab === "comparison" && (
               <div className="space-y-4">
+                {/* Sans structure expérimentale, l'analyse du modèle vient en premier */}
+                {hasAlphafold && structures.length === 0 &&
+                  withViewer(<ModelGeometryPanel accession={accession} onFocus={focusModelResidues} />, "alphafold")}
                 {alphafold?.available && structures.length > 0 && (
                   <ComparisonPanel
                     accession={accession}
@@ -698,6 +760,16 @@ export default function StructurePage() {
                   activeRange={activeRange}
                   autoHighlightRanges={tmRanges}
                 />
+                {hasAlphafold && structures.length > 0 && (
+                  <details className="rounded-lg border border-slate-200 bg-white p-3">
+                    <summary className="cursor-pointer text-[15px] font-semibold text-slate-900">
+                      Analyse du modèle AlphaFold : correspondance des résidus, confiance, géométrie et contacts
+                    </summary>
+                    <div className="mt-3">
+                      {withViewer(<ModelGeometryPanel accession={accession} onFocus={focusModelResidues} />, "alphafold")}
+                    </div>
+                  </details>
+                )}
               </div>
             )}
 
@@ -1260,6 +1332,7 @@ function FocusViewer({
   tmRanges,
   extraRanges,
   activeRange,
+  activeSet = [],
   setActiveRange,
 }: {
   source: Source;
@@ -1269,6 +1342,8 @@ function FocusViewer({
   tmRanges: HighlightRange[];
   extraRanges: HighlightRange[];
   activeRange: HighlightRange | null;
+  /** Résidus non contigus à surligner dans le modèle AlphaFold (poche, contact). */
+  activeSet?: HighlightRange[];
   setActiveRange: (r: HighlightRange | null) => void;
 }) {
   const [showTM, setShowTM] = useState(true);
@@ -1327,7 +1402,7 @@ function FocusViewer({
             pdbUrl={afUrl!}
             mode="alphafold"
             // Une sélection numérotée comme le PDB ne s'applique pas au modèle AlphaFold
-            highlightRanges={activeRange && !pdbNumbered ? [activeRange] : []}
+            highlightRanges={activeSet.length ? activeSet : activeRange && !pdbNumbered ? [activeRange] : []}
             autoHighlightRanges={showTM ? tmRanges : []}
           />
         ) : (

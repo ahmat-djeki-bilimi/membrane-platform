@@ -16,3 +16,8 @@ pybiolib==1.4.551
 
 # Calcul numérique (arbres phylogénétiques)
 numpy==2.3.4
+
+# Rapports PDF
+reportlab==4.2.5
+# Dépendance de reportlab, dans les versions acceptées par requests
+chardet>=5,<6

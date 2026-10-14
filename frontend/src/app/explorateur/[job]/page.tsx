@@ -29,7 +29,7 @@ import ConservationTab from "@/components/explorer/ConservationTab";
 import PhylogenyTab from "@/components/explorer/PhylogenyTab";
 import HomologsTab from "@/components/explorer/HomologsTab";
 import TopologyTab from "@/components/explorer/TopologyTab";
-import { EXPLORER_VERSION, alignmentFasta, submitExplorer, useExplorerJob, type ExplorerResult } from "@/lib/explorer";
+import { EXPLORER_VERSION, alignmentFasta, submitExplorer, useExplorerJob, type ExplorerResult, type QualityParams } from "@/lib/explorer";
 import RerunNotice from "@/components/explorer/RerunNotice";
 import { downloadText } from "@/lib/sequence";
 import { HERO_BG, HERO_GLOW } from "@/lib/theme";
@@ -38,10 +38,10 @@ type TabKey = "overview" | "homologues" | "conservation" | "phylogenie" | "topol
 
 const TABS: { key: TabKey; label: string; icon: React.ReactNode; text: string }[] = [
   { key: "overview", label: "Vue d’ensemble", icon: <LayoutDashboard size={14} />, text: "" },
-  { key: "homologues", label: "Homologues", icon: <Users size={14} />, text: "Famille importée, identité et couverture de chaque homologue" },
-  { key: "conservation", label: "Conservation", icon: <Dna size={14} />, text: "Alignement multiple, positions conservées et variables" },
+  { key: "homologues", label: "Homologues", icon: <Users size={14} />, text: "Filtres, regroupement des séquences proches, diversité taxonomique et choix des homologues analysés" },
+  { key: "conservation", label: "Conservation", icon: <Dna size={14} />, text: "Contrôle qualité de l’alignement, positions conservées et variables" },
   { key: "phylogenie", label: "Phylogénie", icon: <GitBranch size={14} />, text: "Arbre phylogénétique de la référence et de ses homologues" },
-  { key: "topologie", label: "Topologie", icon: <Compass size={14} />, text: "Segments TM et orientation membranaire (DeepTMHMM · AlphaFold · OPM)" },
+  { key: "topologie", label: "Topologie", icon: <Compass size={14} />, text: "Segments TM comparés (DeepTMHMM · UniProt · structure 3D) et orientation calculée" },
   { key: "cartographie", label: "Cartographie", icon: <MapIcon size={14} />, text: "Carte 3D des résidus et positions candidates" },
   { key: "coevolution", label: "Coévolution", icon: <Network size={14} />, text: "Paires de résidus corrélées et réseaux" },
 ];
@@ -72,17 +72,23 @@ function ExplorerResult() {
 
   // Même analyse relancée avec la méthode actuelle (nouvelle tâche, même onglet)
   const jobParams = job?.params;
-  const rerun = jobParams?.fasta
-    ? async () => {
-        const next = await submitExplorer({
-          fasta: jobParams.fasta!,
-          reference: jobParams.reference ?? 0,
-          accession: jobParams.accession ?? null,
-          expand: !!jobParams.expand,
-        });
-        router.push(`/explorateur/${next.id}?tab=${tab}`);
-      }
-    : undefined;
+  // Mêmes séquences : la sélection d'homologues et le contrôle qualité sont gardés sauf s'ils sont remplacés
+  const submit = async (change: { keep?: string[] | null; qc?: QualityParams | null }, nextTab: TabKey) => {
+    const next = await submitExplorer({
+      fasta: jobParams!.fasta!,
+      reference: jobParams!.reference ?? 0,
+      accession: jobParams!.accession ?? null,
+      expand: !!jobParams!.expand,
+      keep: "keep" in change ? change.keep : (jobParams!.keep ?? null),
+      qc: "qc" in change ? change.qc : (jobParams!.qc ?? null),
+    });
+    router.push(`/explorateur/${next.id}?tab=${nextTab}`);
+  };
+  const rerun = jobParams?.fasta ? () => submit({}, tab) : undefined;
+  // Homologues choisis dans l'onglet Homologues : nouvelle analyse
+  const applySelection = jobParams?.fasta ? (keep: string[] | null) => submit({ keep }, "conservation") : undefined;
+  // Filtres du contrôle qualité (onglet Conservation) : nouvelle analyse
+  const applyQuality = jobParams?.fasta ? (qc: QualityParams | null) => submit({ qc }, "conservation") : undefined;
 
   const select = (position: number) => setSelected((current) => (current === position ? null : position));
   const fileBase = result ? (result.reference.accession ?? result.reference.id).replace(/[^\w.-]+/g, "_") : "analyse";
@@ -221,9 +227,16 @@ function ExplorerResult() {
         )}
 
         {ready && tab === "overview" && <Overview result={result} onOpen={openTab} />}
-        {ready && tab === "homologues" && <HomologsTab result={result} />}
-        {ready && tab === "conservation" && <ConservationTab result={result} selected={selected} onSelect={select} />}
-        {ready && tab === "phylogenie" && <PhylogenyTab result={result} fileBase={fileBase} onRerun={rerun} />}
+        {ready && tab === "homologues" && <HomologsTab result={result} onApply={applySelection} />}
+        {ready && tab === "conservation" && <ConservationTab
+            result={result}
+            selected={selected}
+            onSelect={select}
+            quality={jobParams?.qc ?? null}
+            onApplyQuality={applyQuality}
+            fileBase={fileBase}
+          />}
+        {ready && tab === "phylogenie" && <PhylogenyTab result={result} jobId={jobId} fileBase={fileBase} onRerun={rerun} />}
         {ready && tab === "topologie" && <TopologyTab result={result} selected={selected} onSelect={select} />}
         {ready && tab === "cartographie" && <CartographyTab result={result} selected={selected} onSelect={select} fileBase={fileBase} />}
         {ready && tab === "coevolution" && <CoevolutionTab result={result} selected={selected} onSelect={select} fileBase={fileBase} onRerun={rerun} />}
@@ -280,14 +293,20 @@ function Overview({ result, onOpen }: { result: ExplorerResult; onOpen: (tab: Ta
           icon={<Users size={16} />}
           label="Homologues"
           value={`${result.input.kept}`}
-          hint={result.input.expanded ? `dont ${result.input.mmseqs_added} ajoutés par MMseqs2` : `${result.input.excluded.length} séquence(s) écartée(s)`}
+          hint={
+            result.input.selection
+              ? `sélectionnés parmi ${result.input.pool}`
+              : result.input.expanded
+                ? `dont ${result.input.mmseqs_added} ajoutés par MMseqs2`
+                : `${result.input.excluded.length} séquence(s) écartée(s)`
+          }
         />
         <StatCard
           tone="amber"
           icon={<Compass size={16} />}
           label="Segments TM"
           value={`${result.topology.segments.length}`}
-          hint={result.structure ? `modèle ${result.structure.source}${result.structure.membrane ? `, bicouche de ${result.structure.membrane.thickness} Å` : ""}` : "aucune structure 3D"}
+          hint={result.structure ? `modèle ${result.structure.source}${result.structure.membrane ? `, bicouche calculée de ${result.structure.membrane.thickness} Å` : ""}` : "aucune structure 3D"}
         />
         <StatCard tone="rose" icon={<ShieldCheck size={16} />} label="Positions candidates" value={`${result.candidates.length}`} hint={`dont ${functional} fonctionnelle(s) probable(s)`} />
         <StatCard

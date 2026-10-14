@@ -120,10 +120,12 @@ def compute_coevolution(
     rows: list[str],
     min_separation: int = MIN_SEPARATION,
     max_pairs: int = MAX_PAIRS_RETURNED,
+    mask: list[bool] | None = None,
 ) -> dict:
     """
     Paires de positions qui coévoluent. `rows` : alignement ancré, la première
     ligne est la séquence de référence (positions numérotées à partir de 1).
+    `mask` : colonnes peu fiables exclues (sans décaler la numérotation).
     """
     length = len(rows[0]) if rows else 0
     if len(rows) < 2 or length < min_separation + 1:
@@ -136,6 +138,8 @@ def compute_coevolution(
     neff = float(weights.sum())
     mi, gap_fraction = mutual_information(codes, weights)
     valid = gap_fraction <= MAX_GAP_FRACTION
+    if mask is not None:
+        valid &= ~np.asarray(mask, dtype=bool)
     scores = apc(mi, valid)
 
     i_idx, j_idx = np.triu_indices(length, k=min_separation)
@@ -162,5 +166,32 @@ def compute_coevolution(
         "valid_columns": int(valid.sum()),
         "min_separation": min_separation,
         "reliability": reliability(neff, length),
+        "parameters": {
+            "identity_threshold": IDENTITY_THRESHOLD,
+            "pseudocount": PSEUDOCOUNT,
+            "max_gap_fraction": MAX_GAP_FRACTION,
+            "min_separation": min_separation,
+            "masked_columns": int(np.sum(mask)) if mask is not None else 0,
+            "states": STATES,
+        },
+        "distribution": score_distribution(values, mean, std),
         "pairs": pairs,
+    }
+
+
+def score_distribution(values: np.ndarray, mean: float, std: float, bins: int = 40) -> dict:
+    """Histogramme des scores z de toutes les paires évaluées (sélection : seuil et rang)."""
+    if not len(values) or std <= 0:
+        return {"pairs": int(len(values)), "mean": mean, "std": std, "edges": [], "counts": []}
+    z = (values - mean) / std
+    upper = max(float(z.max()), 4.0)
+    counts, edges = np.histogram(z, bins=bins, range=(float(z.min()), upper))
+    return {
+        "pairs": int(len(values)),
+        "mean": round(mean, 5),
+        "std": round(std, 5),
+        "edges": [round(float(e), 2) for e in edges],
+        "counts": counts.tolist(),
+        "above_z3": int(np.sum(z >= 3)),
+        "above_z5": int(np.sum(z >= 5)),
     }

@@ -5,6 +5,8 @@ import { Dna, Eye, Loader2, Search } from "lucide-react";
 import { API_BASE } from "@/lib/api";
 import TopologyDiagram from "@/components/protein/TopologyDiagram";
 import DomainArchitecture from "@/components/protein/DomainArchitecture";
+import InterProTracks from "@/components/protein/InterProTracks";
+import { EvidenceBadge } from "@/components/FunctionalAnnotation";
 
 type AlphaFoldData = {
   available: boolean;
@@ -32,6 +34,9 @@ type DomainType =
 type DomainRegion = HighlightRange & {
   type: DomainType;
   feature_type?: string;
+  /** Nature de la preuve UniProt. */
+  evidence_label?: string;
+  experimental?: boolean;
 };
 
 type SequenceMotif = HighlightRange & {
@@ -174,6 +179,7 @@ export default function StructuralDomains({
                     <th className="px-3 py-2 text-left font-semibold">Description</th>
                     <th className="px-3 py-2 text-right font-semibold">Positions</th>
                     <th className="px-3 py-2 text-right font-semibold">Longueur</th>
+                    <th className="px-3 py-2 text-left font-semibold">Preuve</th>
                     <th className="px-3 py-2" />
                   </tr>
                 </thead>
@@ -194,6 +200,9 @@ export default function StructuralDomains({
                         {d.start}–{d.end}
                       </td>
                       <td className="px-3 py-1.5 text-right font-mono">{d.end - d.start + 1}</td>
+                      <td className="px-3 py-1.5">
+                        {d.evidence_label ? <EvidenceBadge experimental={!!d.experimental} label={d.evidence_label} /> : "—"}
+                      </td>
                       <td className="px-3 py-1.5 text-right">
                         <button
                           onClick={() => onFocusRange(d)}
@@ -210,11 +219,20 @@ export default function StructuralDomains({
             </div>
             </details>
             <p className="text-[13px] text-slate-500">
-              Source : annotations UniProtKB (numérotation UniProt). La numérotation des
+              Source : annotations UniProtKB (numérotation UniProt), avec la nature de leur preuve (code ECO). La numérotation des
               résidus d’une structure PDB peut différer de celle d’UniProt.
             </p>
           </>
         )}
+
+        <div className="rounded-md border border-slate-200 p-3">
+          <h3 className="mb-0.5 text-[15px] font-semibold text-slate-900">Signatures InterPro, Pfam et PROSITE, sites et variants</h3>
+          <p className="mb-2 text-[13px] text-slate-500">
+            Domaines et familles reconnus par les bases membres d’InterPro, résidus catalytiques, sites de liaison et variants
+            fonctionnels documentés dans UniProt, sur la même échelle que la séquence.
+          </p>
+          <InterProTracks accession={accession} length={length} activeRange={activeRange} onFocusRange={onFocusRange} />
+        </div>
 
         <div className="rounded-md border border-slate-200 p-3">
           <div className="mb-2 flex items-center gap-2">

@@ -1,8 +1,12 @@
 """Routes « protéine » : fiche UniProt et domaines annotés."""
 
-from fastapi import APIRouter
+import re
+
+from fastapi import APIRouter, HTTPException, Query
 
 from app.services import uniprot_service as uniprot
+from app.services.functional_annotation_service import functional_annotation
+from app.services.mutation_service import MutationError, analyze_mutation
 
 router = APIRouter(prefix="/api", tags=["Protéines"])
 
@@ -41,3 +45,38 @@ def get_domains(accession: str):
             else "Aucun domaine ni région annoté dans UniProtKB pour cette entrée."
         ),
     }
+
+
+@router.get("/annotations/{accession}")
+def get_annotations(accession: str):
+    """
+    Annotation fonctionnelle : domaines et signatures InterPro (Pfam, PROSITE…),
+    Gene Ontology, résidus catalytiques, sites de liaison et variants
+    fonctionnels, avec la source et la nature (expérimentale ou prédite) de chacun.
+    """
+    accession = accession.upper().strip()
+    if not re.fullmatch(r"[A-Z0-9]{6,10}", accession):
+        raise HTTPException(400, "Accession UniProt invalide.")
+    try:
+        return functional_annotation(accession)
+    except uniprot.UniProtNotFound:
+        raise HTTPException(404, "Entrée UniProt introuvable.")
+    except Exception:
+        raise HTTPException(502, "UniProt est injoignable pour le moment : réessayez dans quelques instants.")
+
+
+@router.get("/mutation/{accession}")
+def get_mutation(accession: str, position: int = Query(..., ge=1), to: str = Query(..., min_length=1, max_length=1)):
+    """
+    Substitution d'un résidu : propriétés, conservation, environnement 3D,
+    contacts et annotations. Les conséquences sont des hypothèses, jamais un verdict.
+    """
+    accession = accession.upper().strip()
+    if not re.fullmatch(r"[A-Z0-9]{6,10}", accession):
+        raise HTTPException(400, "Accession UniProt invalide.")
+    try:
+        return analyze_mutation(accession, position, to)
+    except MutationError as error:
+        raise HTTPException(400, str(error))
+    except uniprot.UniProtNotFound:
+        raise HTTPException(404, "Entrée UniProt introuvable.")

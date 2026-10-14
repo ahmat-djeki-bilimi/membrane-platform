@@ -61,6 +61,9 @@ class PairAlignment:
     identity: float  # identité sur les positions alignées
     coverage: float  # fraction de la séquence étudiée alignée
     score: int
+    # Paires de résidus alignés (indice dans la séquence étudiée, indice dans
+    # l'homologue, à partir de 0) : correspondance complète, insertions comprises
+    pairs: tuple[tuple[int, int], ...] = ()
 
 
 def _clean(sequence: str) -> str:
@@ -163,10 +166,12 @@ def align_to_query(query: str, subject: str, band: int = 100) -> PairAlignment:
 
     score, i, j, state = best
     anchored = ["-"] * n
+    pairs: list[tuple[int, int]] = []
     while i > 0 and j > 0:
         k = j - i - lo
         if state == 0:
             anchored[i - 1] = b[j - 1]
+            pairs.append((i - 1, j - 1))
             state = trace_m[i][k]
             i, j = i - 1, j - 1
         elif state == 1:
@@ -178,7 +183,7 @@ def align_to_query(query: str, subject: str, band: int = 100) -> PairAlignment:
 
     aligned = [(q, s) for q, s in zip(a, anchored) if s != "-"]
     identity = sum(q == s for q, s in aligned) / len(aligned) if aligned else 0.0
-    return PairAlignment("".join(anchored), identity, len(aligned) / n, int(score))
+    return PairAlignment("".join(anchored), identity, len(aligned) / n, int(score), tuple(reversed(pairs)))
 
 
 def significance(score: float, query_length: int, subject_length: int) -> tuple[float, float]:

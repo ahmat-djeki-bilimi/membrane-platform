@@ -1,7 +1,7 @@
 // Membrane Evolution & Function Explorer (route /api/explorer, calcul en file).
 
 import { API_BASE } from "./api";
-import type { ConservationResult, ConservedPosition } from "./conservation";
+import type { ConservationResult, ConservedPosition, Homolog, PhyloTree, TreeModel } from "./conservation";
 import { readJob, useJob, type Job, type JobState } from "./jobs";
 import type { PredictedHelix, TopologySource } from "./prediction";
 
@@ -32,7 +32,53 @@ export type CoevolutionPair = {
   distance?: number | null;
   contact?: boolean;
   confident?: boolean;
+  /** Part des sous-échantillons (70 % des séquences) qui retrouvent la paire parmi les L/5 premières. */
+  stability?: number;
+  /** Score supérieur au meilleur score obtenu sur les alignements mélangés. */
+  above_null?: boolean;
 };
+
+export type CheckStatus = "ok" | "attention" | "probleme";
+
+export type CoevolutionDiagnostics = {
+  sequences: number;
+  neff: number;
+  neff_per_length: number;
+  largest_cluster: number;
+  excluded_columns: number;
+  mean_gap: number;
+  pc1_share: number;
+  pc3_share: number;
+  dominant_group: { rank: string; name: string; share: number; groups: number } | null;
+  checks: { id: string; label: string; value: string; status: CheckStatus; text: string }[];
+  status: CheckStatus;
+};
+
+export type MipRobustness = {
+  subsamples: number;
+  fraction: number;
+  top_count: number;
+  overlaps: number[];
+  mean_overlap: number | null;
+  stable_pairs: number | null;
+  shuffles: number;
+  null_max_score: number | null;
+  above_null: number | null;
+  skipped: boolean;
+  note: string | null;
+};
+
+export type ContactBenchmark = {
+  curve: [number, number][];
+  by_separation: { label: string; count: number; precision: number }[];
+  confident_count: number;
+  confident_precision: number | null;
+  top_precision: number;
+  enrichment: number | null;
+  structure_note: string;
+};
+
+export type Histogram = { edges: number[]; counts: number[] };
 
 export type Coevolution = {
   method: string;
@@ -46,6 +92,12 @@ export type Coevolution = {
   strong_pairs: number;
   precision: { label: string; count: number; precision: number }[];
   random_precision?: number;
+  /** Contrôles (version 10 et suivantes). */
+  parameters?: Record<string, number>;
+  distribution?: Histogram & { pairs: number; mean: number; std: number; above_z3: number; above_z5: number };
+  diagnostics?: CoevolutionDiagnostics;
+  robustness?: MipRobustness;
+  benchmark?: ContactBenchmark | null;
 };
 
 export type Network = {
@@ -70,6 +122,14 @@ export type Sector = {
   zones: Partial<Record<Zone, number>>;
   /** Distance moyenne entre membres / distance moyenne de la protéine (< 1 : groupe compact en 3D). */
   compactness: number | null;
+  /** Conservation contre covariance (version 10 et suivantes). */
+  mean_conservation?: number;
+  conservation_percentile?: number;
+  loading_conservation_r?: number | null;
+  covariance_z?: number | null;
+  stability?: number | null;
+  stability_label?: "stable" | "partiellement stable" | "instable" | null;
+  signal?: "covariance collective" | "dominé par la conservation" | "indéterminé";
 };
 
 export type Sca = {
@@ -83,6 +143,10 @@ export type Sca = {
   components: number;
   sectors: Sector[];
   reliability?: Coevolution["reliability"];
+  parameters?: Record<string, number>;
+  first_mode_conservation_r?: number | null;
+  loading_histograms?: Histogram[];
+  stability_test?: { subsamples: number; fraction: number; sector_counts: number[]; skipped: boolean; note: string | null };
 };
 
 export type MethodComparison = {
@@ -169,7 +233,19 @@ export type ExplorerResult = Omit<ConservationResult, "positions" | "accession" 
     expanded: boolean;
     excluded: { id: string; reason: string }[];
     prealigned: boolean;
+    /** Homologues retenus avant la sélection de l’utilisateur. */
+    pool?: number;
+    /** Analyse restreinte aux homologues choisis dans l’onglet Homologues. */
+    selection?: boolean;
   };
+  /** Homologues retenus mais écartés par l’utilisateur (avec leur ligne alignée). */
+  unselected?: (Homolog & { row: string })[];
+  /** Contrôle qualité de l’alignement (version 7 et suivantes). */
+  qc?: AlignmentQuality;
+  /** Comparaison DeepTMHMM / UniProt / structure 3D / hydropathie (version 9 et suivantes). */
+  topology_comparison?: TopologyComparison;
+  /** Orientation calculée : épaisseur utilisée et limites (version 9 et suivantes). */
+  orientation?: OrientationReport;
   topology: {
     source: TopologySource;
     segments: { start: number; end: number; label: string }[];
@@ -189,14 +265,118 @@ export type ExplorerResult = Omit<ConservationResult, "positions" | "accession" 
   interpretation: { topic: string; title: string; text: string }[];
 };
 
-/** Version actuelle du calcul (METHOD_VERSION du backend) : les analyses plus anciennes peuvent être recalculées. */
-export const EXPLORER_VERSION = 5;
+/** Réglages du contrôle qualité (absents : aucun filtre). Fractions de 0 à 1. */
+export type QualityParams = {
+  min_coverage?: number | null;
+  max_internal_gap?: number | null;
+  max_column_gaps?: number | null;
+  mask_poor_regions?: boolean;
+};
 
-export type ExplorerRequest = { fasta: string; reference: number; accession?: string | null; expand: boolean };
+export type SequenceQuality = {
+  accession: string;
+  coverage: number;
+  start: number | null;
+  end: number | null;
+  longest_internal_gap: number;
+  internal_gaps: number;
+  removed: boolean;
+};
+
+export type PoorRegion = { start: number; end: number; length: number; mean_gap: number; mean_similarity: number; reason: string };
+
+export type AlignmentQuality = {
+  params: Required<QualityParams>;
+  /** Une valeur par position de la référence (indice 0 = position 1). */
+  columns: { gap_fraction: number[]; identity: number[]; similarity: number[]; masked: boolean[]; reasons: (string | null)[] };
+  sequences: SequenceQuality[];
+  /** Séquences écartées comme incomplètes, avec leur ligne alignée. */
+  removed: (Homolog & { row: string; reasons: string[] })[];
+  poor_regions: PoorRegion[];
+  diversity: {
+    mean_pairwise_identity: number | null;
+    median_identity_to_reference: number | null;
+    neff: number;
+    neff_per_length: number;
+    sampled: number;
+  };
+  mapping: { columns: number; reference_length: number; exact: boolean; source_columns: number[] | null };
+  summary: {
+    sequences: number;
+    kept: number;
+    removed: number;
+    masked_columns: number;
+    high_gap_columns: number;
+    mean_gap: number | null;
+    median_coverage: number | null;
+    poor_region_positions: number;
+  };
+};
+
+export type TopologySourceId = "deeptmhmm" | "uniprot" | "structure" | "kd";
+export type UniprotEvidence = "experimental" | "structure" | "similarity" | "inference" | "predicted" | "unknown";
+export type SourceSegment = { start: number; end: number; label?: string; evidence?: UniprotEvidence; evidence_label?: string; mean_plddt?: number | null };
+
+export type TopologyComparison = {
+  /** Source des segments retenus pour l’analyse. */
+  chosen: TopologySource;
+  sources: { id: TopologySourceId; label: string; kind: string; count: number; n_terminus: "in" | "out" | null; note: string | null; segments: SourceSegment[] }[];
+  /** Segments communs : segments des sources qui se recouvrent. */
+  segments: {
+    id: number;
+    label: string;
+    start: number;
+    end: number;
+    in_chosen: boolean;
+    sources: Partial<Record<TopologySourceId, SourceSegment[]>>;
+    shift: number;
+    uniprot_evidence: UniprotEvidence | null;
+    structure_plddt: number | null;
+    helix_crossing: "full" | "short" | "partial" | null;
+    confidence: "forte" | "moyenne" | "faible";
+    confidence_reason: string;
+    notes: string[];
+  }[];
+  divergences: { severity: "majeure" | "mineure"; position: number | null; text: string }[];
+  summary: { segments: number; strong: number; major_divergences: number; minor_divergences: number };
+};
+
+export type OrientationReport = {
+  status: "calculée" | "indisponible";
+  label: string;
+  thickness: number | null;
+  thickness_method?: string;
+  at_search_limit?: boolean;
+  side_method?: "topology" | "positive_inside";
+  n_terminus?: "in" | "out";
+  limits: string[];
+  opm: {
+    pdb_id: string;
+    thickness: number | null;
+    tilt: number | null;
+    n_terminus: "in" | "out" | null;
+    thickness_difference: number | null;
+    n_terminus_agrees: boolean | null;
+  } | null;
+};
+
+/** Version actuelle du calcul (METHOD_VERSION du backend) : les analyses plus anciennes peuvent être recalculées. */
+export const EXPLORER_VERSION = 10;
+
+export type ExplorerRequest = {
+  fasta: string;
+  reference: number;
+  accession?: string | null;
+  expand: boolean;
+  /** Homologues à conserver (absent : tous). */
+  keep?: string[] | null;
+  /** Contrôle qualité de l’alignement. */
+  qc?: QualityParams | null;
+};
 
 export type ExplorerJob = Job<ExplorerResult> & {
   kind?: string;
-  params?: { fasta?: string; expand?: boolean; reference?: number; accession?: string | null };
+  params?: { fasta?: string; expand?: boolean; reference?: number; accession?: string | null; keep?: string[]; qc?: QualityParams };
   sequence_count?: number;
   created_at?: string;
 };
@@ -216,6 +396,29 @@ export function useExplorerJob(jobId: string | null): JobState<ExplorerResult, E
   return useJob<ExplorerResult, ExplorerJob>(
     jobId ? () => fetch(`${API_BASE}/api/jobs/${encodeURIComponent(jobId)}`).then(readJob) : null,
     jobId ?? ""
+  );
+}
+
+/** Nombre maximal de séquences d'un arbre choisi (MAX_TREE_SELECTION du backend). */
+export const MAX_TREE_SELECTION = 200;
+
+export type TreeJobResult = { parent: string; ids: string[]; missing: number; tree: PhyloTree | null };
+
+/** Arbre de la référence et des homologues choisis (calcul en file, à partir de l'alignement de l'analyse). */
+export async function submitTree(jobId: string, ids: string[], model: TreeModel): Promise<Job<TreeJobResult>> {
+  const response = await fetch(`${API_BASE}/api/explorer/${encodeURIComponent(jobId)}/tree`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids, model }),
+  });
+  return readJob(response);
+}
+
+/** Suit un arbre choisi par l'identifiant de sa tâche (gardé dans l'adresse de la page). */
+export function useTreeJob(treeJobId: string | null): JobState<TreeJobResult> {
+  return useJob<TreeJobResult>(
+    treeJobId ? () => fetch(`${API_BASE}/api/jobs/${encodeURIComponent(treeJobId)}`).then(readJob) : null,
+    treeJobId ?? ""
   );
 }
 
@@ -325,7 +528,7 @@ export function toCsv(header: string[], rows: unknown[][]) {
 export function residuesCsv(result: ExplorerResult) {
   const candidates = new Map(result.candidates.map((c) => [c.position, c]));
   return toCsv(
-    ["position", "residu", "grade", "score_JS", "gaps", "region", "zone", "z_A", "enfouissement", "pLDDT", "couplages", "reseau", "secteur_SCA", "candidat", "raisons"],
+    ["position", "residu", "grade", "score_JS", "gaps", "colonne_masquee", "region", "zone", "z_A", "enfouissement", "pLDDT", "couplages", "reseau", "secteur_SCA", "candidat", "raisons"],
     result.positions.map((p) => {
       const c = candidates.get(p.position);
       return [
@@ -334,6 +537,7 @@ export function residuesCsv(result: ExplorerResult) {
         p.grade,
         p.score,
         p.gap_fraction,
+        p.masked ? "oui" : "non",
         p.region,
         ZONES[p.zone]?.label ?? p.zone,
         p.z ?? "",

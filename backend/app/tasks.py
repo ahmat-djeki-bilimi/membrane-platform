@@ -13,9 +13,11 @@ from typing import Callable
 from huey import RedisHuey, SqliteHuey
 from sqlalchemy import update
 
+from app import provenance
 from app.config import get_settings
 from app.db import session_scope
 from app.models import Job
+from app.services import runs
 
 logger = logging.getLogger("memprotscope.tasks")
 settings = get_settings()
@@ -29,7 +31,8 @@ else:
 def _runners() -> dict[str, Callable[[dict], dict]]:
     """Calculs disponibles, par type de tâche."""
     from app.services.conservation_service import compute_conservation, compute_sequence_conservation
-    from app.services.explorer_service import run_explorer
+    from app.services.explorer_service import run_explorer, run_explorer_tree
+    from app.services.protein_comparison_service import compare_proteins
     from app.services.membrane_service import predict_topology_isolated
     from app.services.structure_prediction_service import predict_structure
 
@@ -37,7 +40,11 @@ def _runners() -> dict[str, Callable[[dict], dict]]:
         "deeptmhmm": lambda p: predict_topology_isolated(p["sequence"], p.get("name", "query")),
         "conservation": lambda p: compute_conservation(p["accession"], p.get("source", "uniref50")),
         "conservation_sequence": lambda p: compute_sequence_conservation(p["sequence"], p.get("name", "query")),
-        "explorer": lambda p: run_explorer(p["fasta"], p.get("reference", 0), p.get("accession"), p.get("expand", False)),
+        "explorer": lambda p: run_explorer(
+            p["fasta"], p.get("reference", 0), p.get("accession"), p.get("expand", False), p.get("keep"), p.get("qc")
+        ),
+        "explorer_tree": lambda p: run_explorer_tree(p["job"], p["ids"], p.get("model", "kimura")),
+        "protein_comparison": lambda p: compare_proteins(p["accessions"], p.get("reference", 0)),
         "structure_prediction": lambda p: predict_structure(
             p["sequence"],
             name=p.get("name", "query"),
@@ -66,19 +73,40 @@ def run_job(job_id: str) -> None:
         job = session.get(Job, job_id)
         kind, params = job.kind, dict(job.params)
 
+    # Traçabilité : étapes, sources et versions, entrées, outils
+    recorder = provenance.Recorder(job_id, kind)
+    token = provenance.activate(recorder)
     try:
         runner = _runners()[kind]
         result = runner(params)
         status, error = "succeeded", None
+        recorder.close()
     except Exception as exc:  # l'erreur est conservée pour l'utilisateur
         logger.exception("Tâche %s (%s) en échec", job_id, kind)
         result, status, error = None, "failed", str(exc)[:2000]
+        recorder.close(error=error)
+    finally:
+        provenance.deactivate(token)
+
+    record = recorder.to_dict()
+    if not record["steps"]:
+        # Calcul sans étapes détaillées : une seule étape
+        record["steps"] = [{"name": "Calcul", "detail": None, "status": status, "started_at": now.isoformat(timespec="seconds"), "duration": record["duration"], "error": error, "cache_hits": sum(s["cached_responses"] for s in record["sources"])}]
+    record.update(
+        {
+            "environment": provenance.environment(),
+            "fingerprint": provenance.fingerprint(kind, params),
+            "methods": runs.methods(kind, params),
+            "declared_inputs": runs.declared_inputs(kind, params),
+        }
+    )
 
     with session_scope() as session:
         job = session.get(Job, job_id)
         job.status = status
         job.result = result
         job.error = error
+        job.provenance = record
         job.finished_at = datetime.now(timezone.utc)
 
 

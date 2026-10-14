@@ -256,3 +256,59 @@ def test_mmseqs_homologs_deduplicated_and_rescored(monkeypatch):
     new = next(h for h in alignment["homologs"] if h.get("source") == "mmseqs")
     assert new["accession"] == "UniRef100_Q22222"
     assert new["bits"] != 999 and new["evalue"] < 1e-10
+
+
+# ---------------------------------------------------------------------------
+# Sélection des homologues par l'utilisateur
+# ---------------------------------------------------------------------------
+
+def test_select_homologs_keeps_choice_and_returns_others():
+    alignment = ex.build_alignment(ex.parse_fasta(fasta(family(5))), 0)
+    ids = [h["accession"] for h in alignment["homologs"]]
+    unselected, missing = ex.select_homologs(alignment, [ids[0], ids[2], "absent"])
+    assert [h["accession"] for h in alignment["homologs"]] == [ids[0], ids[2]]
+    assert len(alignment["rows"]) == 2
+    assert {h["accession"] for h in unselected} == set(ids) - {ids[0], ids[2]}
+    assert all(len(h["row"]) == len(REFERENCE) for h in unselected)
+    assert missing == 1
+    with pytest.raises(ex.ExplorerError):
+        ex.select_homologs(alignment, ["absent"])
+
+
+def test_run_explorer_with_selection():
+    full = ex.run_explorer(fasta(family(30)))
+    keep = [h["accession"] for h in full["homologs"][:12]]
+    result = ex.run_explorer(fasta(family(30)), keep=keep)
+    assert result["input"]["selection"] is True
+    assert result["input"]["pool"] == 30
+    assert result["input"]["kept"] == 12
+    assert {h["accession"] for h in result["homologs"]} == set(keep)
+    assert len(result["unselected"]) == 18
+    assert result["tree"]["leaf_count"] == 13
+    assert all("lineage" in h for h in result["homologs"])
+
+
+def test_explorer_route_selection():
+    client = TestClient(app)
+    assert client.post("/api/explorer", json={"fasta": fasta(family(12)), "keep": []}).status_code == 400
+    response = client.post("/api/explorer", json={"fasta": fasta(family(12)), "keep": ["seq3", "seq1", "seq1"]})
+    assert response.status_code == 200
+    done = client.get(f"/api/jobs/{response.json()['id']}").json()
+    assert done["params"]["keep"] == ["seq1", "seq3"]
+    assert done["result"]["input"]["kept"] == 2
+
+
+def test_explorer_tree_on_selection():
+    client = TestClient(app)
+    job = client.post("/api/explorer", json={"fasta": fasta(family(15))}).json()
+    ids = [m["accession"] for m in client.get(f"/api/jobs/{job['id']}").json()["result"]["msa"]][:6]
+    assert client.post(f"/api/explorer/{job['id']}/tree", json={"ids": ids[:2]}).status_code == 422
+    assert client.post(f"/api/explorer/{job['id']}/tree", json={"ids": ["x", "y", "z"]}).status_code == 400
+    assert client.post("/api/explorer/inconnu/tree", json={"ids": ids}).status_code == 404
+    response = client.post(f"/api/explorer/{job['id']}/tree", json={"ids": ids, "model": "p"})
+    assert response.status_code == 200
+    done = client.get(f"/api/jobs/{response.json()['id']}").json()
+    assert done["status"] == "succeeded", done["error"]
+    tree = done["result"]["tree"]
+    assert tree["leaf_count"] == 7 and tree["model"]["id"] == "p"
+    assert {leaf["id"] for leaf in tree["leaves"] if not leaf["is_query"]} == set(ids)

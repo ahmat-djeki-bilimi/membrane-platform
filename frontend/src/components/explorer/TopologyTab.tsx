@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { ExternalLink } from "lucide-react";
+import { AlertTriangle, ExternalLink } from "lucide-react";
 import TopologyDiagram from "@/components/protein/TopologyDiagram";
 import { InfoBox } from "@/components/ui";
 import { gradeColor } from "@/lib/conservation";
-import { TOPOLOGY_SOURCES, ZONES, type ExplorerResult } from "@/lib/explorer";
+import { TOPOLOGY_SOURCES, ZONES, type ExplorerResult, type OrientationReport } from "@/lib/explorer";
+import TopologyComparison from "./TopologyComparison";
 import type { Region } from "@/lib/topology";
 
 const Membrane3DViewer = dynamic(() => import("@/components/Membrane3DViewer"), { ssr: false });
@@ -89,11 +90,20 @@ export default function TopologyTab({
         )}
       </section>
 
+      {result.topology_comparison ? (
+        <TopologyComparison result={result} comparison={result.topology_comparison} selected={selected} onSelect={onSelect} />
+      ) : (
+        <p className="rounded-lg border border-slate-200 bg-white p-4 text-[14px] text-slate-600">
+          Comparaison DeepTMHMM / UniProt / structure 3D indisponible pour cette analyse ancienne : recalculez-la (bandeau en haut de la page).
+        </p>
+      )}
+
       {structure ? (
         <div className="grid gap-4 xl:grid-cols-[1.15fr_1fr]">
           <section className="rounded-lg border border-slate-200 bg-white p-4">
-            <h3 className="text-[16px] font-semibold text-slate-900">
+            <h3 className="flex flex-wrap items-center gap-2 text-[16px] font-semibold text-slate-900">
               Orientation dans la membrane — modèle {structure.source}
+              <CalculatedBadge />
             </h3>
             <p className="mb-2 text-[13px] text-slate-500">
               {structure.method}
@@ -114,8 +124,11 @@ export default function TopologyTab({
           </section>
 
           <div className="space-y-4">
+            {result.orientation && <OrientationPanel orientation={result.orientation} opm={opm} />}
+
+            {!result.orientation && (
             <section className="rounded-lg border border-slate-200 bg-white p-4">
-              <h3 className="text-[16px] font-semibold text-slate-900">Bicouche ajustée et validation OPM</h3>
+              <h3 className="text-[16px] font-semibold text-slate-900">Bicouche ajustée (calculée) et comparaison avec OPM</h3>
               <dl className="mt-2 grid gap-2 sm:grid-cols-2">
                 <InfoBox label="Épaisseur hydrophobe (modèle)" value={membrane ? `${membrane.thickness} Å` : "non placée"} />
                 <InfoBox
@@ -145,6 +158,7 @@ export default function TopologyTab({
                 </p>
               )}
             </section>
+            )}
 
             {structure.helices.length > 0 && (
               <section className="rounded-lg border border-slate-200 bg-white">
@@ -189,6 +203,75 @@ export default function TopologyTab({
   );
 }
 
+/** Étiquette rappelant qu'une orientation est calculée, jamais mesurée. */
+function CalculatedBadge() {
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[12px] font-semibold text-amber-900"
+      title="Orientation obtenue par calcul sur un modèle ; elle n’a pas été validée expérimentalement"
+    >
+      <AlertTriangle size={12} />
+      Calculée, non validée expérimentalement
+    </span>
+  );
+}
+
+/** Épaisseur membranaire utilisée, origine du côté cytoplasmique, comparaison avec OPM et limites. */
+function OrientationPanel({ orientation, opm }: { orientation: OrientationReport; opm: ExplorerResult["opm"] }) {
+  const o = orientation.opm;
+  return (
+    <section className="rounded-lg border border-amber-200 bg-white p-4">
+      <h3 className="flex flex-wrap items-center gap-2 text-[16px] font-semibold text-slate-900">
+        Orientation calculée
+        <CalculatedBadge />
+      </h3>
+      <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+        <InfoBox
+          label="Épaisseur hydrophobe utilisée"
+          value={orientation.thickness != null ? `${orientation.thickness} Å${orientation.at_search_limit ? " (limite de la recherche)" : ""}` : "—"}
+        />
+        <InfoBox
+          label="Côté cytoplasmique"
+          value={orientation.side_method === "topology" ? "repris de la topologie" : orientation.side_method === "positive_inside" ? "règle positive-inside" : "—"}
+        />
+        <InfoBox
+          label="OPM (structure expérimentale, orientation calculée)"
+          value={o ? `${o.thickness != null ? `${o.thickness} Å` : "épaisseur inconnue"} · ${o.pdb_id}` : opm?.structure_count ? "aucune structure dans OPM" : "pas de structure PDB"}
+        />
+        <InfoBox
+          label="Écart avec OPM"
+          value={
+            o
+              ? [
+                  o.thickness_difference != null ? `${o.thickness_difference > 0 ? "+" : ""}${o.thickness_difference} Å` : null,
+                  o.n_terminus_agrees == null ? null : o.n_terminus_agrees ? "N-terminal du même côté" : "N-terminal du côté opposé",
+                  o.tilt != null ? `inclinaison OPM ${o.tilt}°` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || "—"
+              : "—"
+          }
+        />
+      </dl>
+      {orientation.thickness_method && <p className="mt-2 text-[13px] text-slate-500">{orientation.thickness_method}.</p>}
+      {opm?.pdb_id && opm.url && (
+        <p className="mt-1 text-[13px] text-slate-600">
+          OPM : {opm.type} · {opm.superfamily} › {opm.family} · {opm.membrane}.{" "}
+          <a href={opm.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 font-semibold text-blue-700 hover:underline">
+            Fiche OPM <ExternalLink size={11} />
+          </a>
+        </p>
+      )}
+      <p className="mt-3 text-[13px] font-semibold text-slate-700">Limites de cette orientation</p>
+      <ul className="mt-1 list-disc space-y-1 pl-5 text-[13px] leading-5 text-slate-700">
+        {orientation.limits.map((limit) => (
+          <li key={limit}>{limit}</li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /** Profondeur de chaque résidu dans la membrane (axe z du modèle), le long de la séquence. */
 function DepthProfile({
   result,
@@ -213,7 +296,8 @@ function DepthProfile({
     <section className="rounded-lg border border-slate-200 bg-white p-4">
       <h3 className="text-[16px] font-semibold text-slate-900">Profondeur des résidus dans la membrane</h3>
       <p className="mb-2 text-[13px] text-slate-500">
-        Position de chaque Cα le long de la normale (0 = centre de la bicouche ; haut = côté externe). Couleur : zone.
+        Position de chaque Cα le long de la normale de la bicouche calculée (0 = centre ; haut = côté externe). Couleur : zone.
+        Ces profondeurs dépendent de l’orientation calculée : ce ne sont pas des mesures.
       </p>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Profondeur des résidus">
         <rect x={L} y={y(half)} width={W - L - 8} height={y(-half) - y(half)} fill="#fef3c7" />

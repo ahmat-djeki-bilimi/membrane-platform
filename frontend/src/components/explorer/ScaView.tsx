@@ -6,6 +6,7 @@ import { Boxes, Layers, Sigma, Target } from "lucide-react";
 import { StatCard } from "@/components/ui";
 import { SECTOR_COLORS, ZONES, type ExplorerResult, type Sector, type Zone } from "@/lib/explorer";
 import RerunNotice from "./RerunNotice";
+import { ScaControls, SignalBadge } from "./CoevolutionControls";
 import { LegendItem, type ResidueMark } from "./ExplorerViewer";
 
 const ExplorerViewer = dynamic(() => import("./ExplorerViewer"), { ssr: false });
@@ -66,7 +67,7 @@ export default function ScaView({
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard tone="violet" icon={<Sigma size={15} />} label="Modes significatifs" value={`${sca.significant_modes}`} hint={`valeurs propres au-dessus du hasard (seuil ${sca.random_threshold})`} />
+        <StatCard tone="violet" icon={<Sigma size={15} />} label="Modes significatifs" value={`${sca.significant_modes}`} hint={`valeurs propres au-dessus du hasard (seuil ${sca.random_threshold}) ; le 1er reflète surtout la conservation`} />
         <StatCard tone="rose" icon={<Boxes size={15} />} label="Secteurs" value={`${sectors.length}`} hint={`${sectors.reduce((n, s) => n + s.size, 0)} positions au total`} />
         <StatCard
           tone="amber"
@@ -126,6 +127,8 @@ export default function ScaView({
         </div>
       </div>
 
+      <ScaControls sca={sca} />
+
       <section className="rounded-lg border border-slate-200 bg-white p-4 text-[14px] leading-6 text-slate-600">
         <h3 className="mb-1 text-[16px] font-semibold text-slate-900">Méthode et lecture</h3>
         <p>
@@ -174,6 +177,12 @@ function SectorCard({
         {sector.compactness != null ? ` · compacité ${sector.compactness}` : ""}
       </p>
       {zones && <p className="text-[12px] text-slate-500">{zones}</p>}
+      {(sector.signal || sector.stability_label) && (
+        <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-slate-600">
+          {sector.signal && <SignalBadge signal={sector.signal} />}
+          {sector.stability_label && <span>· {sector.stability_label} au sous-échantillonnage ({sector.stability})</span>}
+        </p>
+      )}
       <div className="mt-1.5 flex flex-wrap gap-1">
         {[...sector.residues]
           .sort((a, b) => b.weight - a.weight)

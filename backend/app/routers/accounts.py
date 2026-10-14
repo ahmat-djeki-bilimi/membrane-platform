@@ -78,7 +78,8 @@ class ProjectRequest(BaseModel):
 
 
 class AnalysisRequest(BaseModel):
-    kind: Literal["accession", "sequence", "structure"]
+    # run : exécution d’une analyse (payload : job_id, kind)
+    kind: Literal["accession", "sequence", "structure", "run"]
     title: str = Field(min_length=1, max_length=255)
     payload: dict = Field(default_factory=dict)
     notes: str = Field(default="", max_length=5000)

@@ -11,6 +11,8 @@ export type ConservedPosition = {
   gap_fraction: number;
   query_residue_frequency: number;
   top_residues: { residue: string; frequency: number }[];
+  /** Colonne peu fiable (contrôle qualité) : gardée à sa position, exclue des calculs. */
+  masked?: boolean;
 };
 
 export type Homolog = {
@@ -29,6 +31,8 @@ export type Homolog = {
   /** Origine : fichier importé ou recherche étendue MMseqs2. */
   source?: "mmseqs";
   link?: string | null;
+  /** Lignée taxonomique (rang → nom), Explorateur. */
+  lineage?: Record<string, string>;
 };
 
 export type ConservationSource = "uniref50" | "mmseqs";
@@ -89,8 +93,28 @@ export type PhyloLeaf = {
   lineage: Record<string, string>;
 };
 
+export type TreeModel = "kimura" | "poisson" | "p";
+
 export type PhyloTree = {
   method: string;
+  /** Méthode de reconstruction, modèle de distance, racine et support (analyses récentes). */
+  reconstruction?: string;
+  model?: { id: TreeModel; label: string; formula: string; text: string };
+  rooting?: string;
+  support?: { method: string; replicates: number; strong: number };
+  diagnostics?: {
+    informative_sites: number;
+    columns: number;
+    masked_columns: number;
+    mean_overlap: number | null;
+    saturated_fraction: number;
+    median_identity: number | null;
+    mean_support: number | null;
+    strong_fraction: number | null;
+    internal_branches: number;
+  };
+  reliability?: "correcte" | "prudence" | "insuffisante";
+  limits?: string[];
   bootstrap_replicates: number;
   leaf_count: number;
   max_distance: number;

@@ -213,6 +213,12 @@ export default function HomePage() {
             title="Pipeline d’analyse"
             text="Chaque requête suit le même enchaînement. L’analyse structurale n’est menée que si la protéine est identifiée comme membranaire."
           />
+          <p className="border-t border-slate-100 px-4 py-2 text-[14px] text-slate-600">
+            Chaque calcul garde ses étapes, ses paramètres, les versions des bases consultées et ses erreurs :{" "}
+            <Link href="/analyses" className="font-semibold text-blue-700 hover:underline">
+              suivre mes analyses, les reprendre, les comparer et exporter un rapport →
+            </Link>
+          </p>
           <ol className="grid border-t border-slate-100 sm:grid-cols-2 lg:grid-cols-5">
             {PIPELINE.map((step, i) => (
               <li

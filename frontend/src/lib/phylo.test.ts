@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { PhyloNode } from "./conservation";
-import { groupColors, GROUP_COLORS, layoutTree, scaleBarLength } from "./phylo";
+import {
+  groupColors,
+  GROUP_COLORS,
+  layoutTree,
+  leafColoring,
+  leafKey,
+  legendRows,
+  OTHER_COLOR,
+  OTHER_LABEL,
+  scaleBarLength,
+  UNKNOWN_GROUP_COLOR,
+  UNKNOWN_LABEL,
+} from "./phylo";
 
 // ((A:1,B:2):0.5,C:3)
 const leaf = (i: number, length: number): PhyloNode => ({ leaf: i, length, size: 1 });
@@ -54,5 +66,35 @@ describe("groupColors", () => {
     expect(colors.get("G0")).toBe(GROUP_COLORS[0]);
     expect(colors.size).toBe(GROUP_COLORS.length);
     expect(colors.has("G9")).toBe(false);
+  });
+});
+
+describe("coloration des feuilles", () => {
+  const leaf = (organism: string | null, phylum?: string) => ({ organism, lineage: (phylum ? { phylum } : {}) as Record<string, string> });
+
+  it("colore par groupe taxonomique ou par organisme", () => {
+    const leaves = [leaf("Homo sapiens", "Chordata"), leaf("Mus musculus", "Chordata"), leaf("Drosophila melanogaster", "Arthropoda"), leaf(null)];
+    const byPhylum = leafColoring(leaves, "group", "phylum");
+    expect(byPhylum.legend.map((l) => [l.name, l.count])).toEqual([["Chordata", 2], ["Arthropoda", 1], [UNKNOWN_LABEL, 1]]);
+    expect(byPhylum.colorOf(leaves[0])).toBe(GROUP_COLORS[0]);
+    expect(byPhylum.colorOf(leaves[3])).toBe(UNKNOWN_GROUP_COLOR);
+    expect(leafColoring(leaves, "organism", "phylum").legend).toHaveLength(4);
+    expect(leafKey(leaf("[Candida] glabrata (levure)"), "group", "genus")).toBe("Candida");
+    expect(leafColoring(leaves, "none", "phylum").legend).toEqual([]);
+  });
+
+  it("réunit sous « Autres » les groupes au-delà de la palette", () => {
+    const leaves = Array.from({ length: 10 }, (_, k) => leaf(`Espèce ${String.fromCharCode(65 + k)}`));
+    const coloring = leafColoring(leaves, "organism", "phylum");
+    expect(coloring.legend).toHaveLength(GROUP_COLORS.length);
+    expect(coloring.legend.at(-1)!.name.startsWith(OTHER_LABEL)).toBe(true);
+    expect(coloring.colorOf(leaves[9])).toBe(OTHER_COLOR);
+  });
+
+  it("découpe la légende en lignes", () => {
+    const items = Array.from({ length: 6 }, (_, k) => ({ name: `Groupe ${k}`, count: 1 }));
+    const rows = legendRows(items, 200);
+    expect(rows.flat()).toHaveLength(6);
+    expect(rows.length).toBeGreaterThan(1);
   });
 });

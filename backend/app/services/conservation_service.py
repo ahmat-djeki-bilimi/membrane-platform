@@ -16,9 +16,10 @@ Conservation évolutive de chaque résidu d'une protéine.
 
 import math
 import re
+from bisect import bisect_right
 from collections import Counter, defaultdict
 
-from app import http
+from app import http, provenance
 from app.services.alignment import align_to_query
 from app.services.homology_service import fetch_uniref_organisms, run_mmseqs
 from app.services.phylogeny_service import build_tree
@@ -180,6 +181,26 @@ def grade_scores(scores: list[float]) -> list[int]:
     return grades
 
 
+def grades_with_mask(scores: list[float], reliable: list[bool]) -> list[int]:
+    """
+    Grades classés sur les seules colonnes fiables ; une colonne masquée reçoit
+    le grade d'une colonne fiable de score égal ou juste inférieur (à titre
+    indicatif, comme les positions « données insuffisantes » de ConSurf).
+    """
+    kept = [i for i, ok in enumerate(reliable) if ok]
+    if not kept or len(kept) == len(scores):
+        return grade_scores(scores)
+    grades = [0] * len(scores)
+    for i, grade in zip(kept, grade_scores([scores[i] for i in kept])):
+        grades[i] = grade
+    ranked = sorted((scores[i], grades[i]) for i in kept)
+    keys = [s for s, _ in ranked]
+    for i, ok in enumerate(reliable):
+        if not ok:
+            grades[i] = ranked[max(bisect_right(keys, scores[i]) - 1, 0)][1]
+    return grades
+
+
 # ---------------------------------------------------------------------------
 # Régions membranaires
 # ---------------------------------------------------------------------------
@@ -286,10 +307,19 @@ def analyze_alignment(
     homologs: list[dict],
     regions: list[dict],
     segments: list[dict],
+    mask: list[bool] | None = None,
 ) -> dict:
-    """Scores de conservation, régions et résumé à partir d'un alignement ancré."""
+    """
+    Scores de conservation, régions et résumé à partir d'un alignement ancré.
+    `mask` : colonnes peu fiables (contrôle qualité), gardées à leur position
+    mais exclues des poids, du classement en grades et des moyennes.
+    """
     all_rows = [query] + rows
-    weights = henikoff_weights(all_rows)
+    reliable = [not m for m in mask] if mask else [True] * len(query)
+    if all(reliable) or not any(reliable):
+        weights = henikoff_weights(all_rows)
+    else:
+        weights = henikoff_weights(["".join(c for c, ok in zip(row, reliable) if ok) for row in all_rows])
 
     positions, scores = [], []
     for index, column in enumerate(zip(*all_rows)):
@@ -309,11 +339,14 @@ def analyze_alignment(
         )
         scores.append(score)
 
-    for position, grade in zip(positions, grade_scores(scores)):
+    for position, grade, ok in zip(positions, grades_with_mask(scores, reliable), reliable):
         position["grade"] = grade
+        if mask is not None:
+            position["masked"] = not ok
+    usable = [p for p, ok in zip(positions, reliable) if ok]
 
     for region in regions:
-        region["mean_score"] = _mean([p["score"] for p in positions[region["start"] - 1:region["end"]]])
+        region["mean_score"] = _mean([p["score"] for p in positions[region["start"] - 1:region["end"]] if reliable[p["position"] - 1]])
         region["length"] = region["end"] - region["start"] + 1
 
     in_tm = {p for s in segments for p in range(s["start"], s["end"] + 1)}
@@ -334,14 +367,14 @@ def analyze_alignment(
         "query_sequence": query,
         "positions": positions,
         "summary": {
-            "mean_score": _mean(scores),
-            "tm_mean_score": _mean([p["score"] for p in positions if p["position"] in in_tm]),
-            "loop_mean_score": _mean([p["score"] for p in positions if p["position"] not in in_tm]),
+            "mean_score": _mean([p["score"] for p in usable]),
+            "tm_mean_score": _mean([p["score"] for p in usable if p["position"] in in_tm]),
+            "loop_mean_score": _mean([p["score"] for p in usable if p["position"] not in in_tm]),
             "tm_segments": segments,
             "regions": regions,
             "most_conserved": [
                 {"position": p["position"], "residue": p["residue"], "score": p["score"]}
-                for p in sorted(positions, key=lambda p: -p["score"])[:20]
+                for p in sorted(usable, key=lambda p: -p["score"])[:20]
             ],
         },
         "homologs": homologs[:MAX_HOMOLOGS_RETURNED],
@@ -465,18 +498,23 @@ def _add_tree(result: dict, query: str, query_info: dict) -> None:
 def compute_conservation(accession: str, source: str = "uniref50") -> dict:
     """Conservation d'une entrée UniProt (homologues UniRef50 ou MMseqs2)."""
     accession = accession.upper().strip()
+    provenance.mark("Fiche UniProt")
     entry = fetch_entry(accession)
     query = entry.get("sequence", {}).get("value", "")
     if not query:
         raise ConservationError("Séquence UniProt indisponible.")
+    provenance.record_input("Entrée UniProt", accession, longueur=len(query))
 
+    provenance.mark("Recherche et alignement des homologues", "MMseqs2 (UniRef)" if source == "mmseqs" else "cluster UniRef50")
     if source == "mmseqs":
         rows, homologs, meta = _mmseqs_alignment(query)
     else:
         rows, homologs, meta = _uniref50_alignment(accession, query)
 
+    provenance.mark("Conservation (Jensen-Shannon)")
     result = analyze_alignment(query, rows, homologs, membrane_regions(entry, len(query)), tm_segments(entry))
     organism = entry.get("organism") or {}
+    provenance.mark("Arbre phylogénétique")
     _add_tree(result, query, {"id": accession, "organism": organism.get("scientificName"), "taxon_id": organism.get("taxonId")})
     return {"accession": accession, **meta, **result}
 
