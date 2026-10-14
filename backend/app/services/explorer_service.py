@@ -1273,16 +1273,31 @@ def run_explorer(
 # Arbre sur des séquences choisies (onglet Phylogénie)
 # ---------------------------------------------------------------------------
 
-def run_explorer_tree(job_id: str, ids: list[str], model: str = "kimura") -> dict:
-    """
-    Arbre de la référence et des homologues choisis, à partir de l'alignement
-    d'une analyse terminée (sans recalculer conservation, structure ni coévolution).
-    Les colonnes masquées par le contrôle qualité de cette analyse sont exclues.
-    """
+def explorer_result(job_id: str) -> dict:
+    """Résultat d'une analyse de l'Explorateur terminée."""
     parent = jobs.get(job_id)
     if not parent or parent["kind"] != "explorer" or parent["status"] != "succeeded" or not parent["result"]:
         raise ExplorerError("Analyse introuvable ou non terminée.")
-    result = parent["result"]
+    return parent["result"]
+
+
+def run_explorer_tree(
+    job_id: str,
+    ids: list[str],
+    model: str = "kimura",
+    method: str = "nj",
+    ml_model: str | None = None,
+    replicates: int = 100,
+    selection: dict | None = None,
+) -> dict:
+    """
+    Arbre de la référence et des homologues choisis, à partir de l'alignement
+    d'une analyse terminée (sans recalculer conservation, structure ni coévolution).
+    Neighbor-Joining (rapide) ou maximum de vraisemblance avec IQ-TREE.
+    Les colonnes masquées par le contrôle qualité de cette analyse sont exclues.
+    """
+    provenance.mark("Sélection des séquences", (selection or {}).get("label"))
+    result = explorer_result(job_id)
     wanted = set(ids)
     msa = [m for m in result["msa"] if m["accession"] in wanted]
     if len(msa) < 3:
@@ -1296,14 +1311,20 @@ def run_explorer_tree(job_id: str, ids: list[str], model: str = "kimura") -> dic
     lineages = {h["taxon_id"]: h["lineage"] for h in result["homologs"] if h.get("taxon_id") and h.get("lineage")}
     if query_leaf.get("taxon_id") and query_leaf.get("lineage"):
         lineages[query_leaf["taxon_id"]] = query_leaf["lineage"]
+    for line in msa:
+        provenance.record_input("Séquence de l’arbre", line["accession"])
     tree = build_tree(
         result["query_sequence"],
         {"id": reference.get("accession") or reference["id"], "organism": reference.get("organism"), "taxon_id": query_leaf.get("taxon_id")},
         msa,
         result["homologs"],
+        replicates=replicates,
         lineages=lineages,
         model=model,
         mask=((result.get("qc") or {}).get("columns") or {}).get("masked"),
+        method=method,
+        ml_model=ml_model,
+        selection=selection,
     )
     return {"parent": job_id, "ids": sorted(m["accession"] for m in msa), "missing": len(wanted) - len(msa), "tree": tree}
 

@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     # Prédiction de structure ESMFold (API publique ESM Atlas)
     esmfold_url: str = "https://api.esmatlas.com/foldSequence/v1/pdb/"
 
+    # IQ-TREE (maximum de vraisemblance) : chemin du programme, sinon recherché
+    # dans le PATH (iqtree3, iqtree2, iqtree). Absent : seul Neighbor-Joining est proposé.
+    iqtree_path: str = ""
+    iqtree_threads: int = 2
+    iqtree_timeout_seconds: int = 3 * 3600
+
     # Applique les migrations au démarrage de l'API (désactivé en production,
     # où `alembic upgrade head` est lancé une seule fois avant les serveurs)
     auto_migrate: bool = True

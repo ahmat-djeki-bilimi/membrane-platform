@@ -3,12 +3,12 @@
 import re
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app import jobs
 from app.cache import cached, is_successful
-from app.services import explorer_service, uniprot_service
+from app.services import explorer_service, iqtree_service, tree_selection_service, uniprot_service
 
 router = APIRouter(prefix="/api/explorer", tags=["Explorateur"])
 
@@ -78,28 +78,75 @@ def explore(payload: ExplorerRequest):
 
 
 class TreeRequest(BaseModel):
-    # Homologues de l'alignement à placer dans l'arbre (la référence est toujours incluse)
-    ids: list[str] = Field(min_length=3, max_length=explorer_service.MAX_TREE_SELECTION)
+    # Stratégie de choix des séquences (la référence est toujours incluse)
+    strategy: Literal["closest", "taxonomic", "diversity", "custom"] = "custom"
+    # Nombre d'homologues voulu (stratégies automatiques)
+    count: int = Field(50, ge=3, le=explorer_service.MAX_TREE_SELECTION)
+    # Homologues choisis un à un (stratégie « custom »)
+    ids: list[str] | None = Field(None, max_length=explorer_service.MAX_TREE_SELECTION)
+    # nj : Neighbor-Joining (rapide) ; ml : maximum de vraisemblance avec IQ-TREE
+    method: Literal["nj", "ml"] = "nj"
     model: Literal["kimura", "poisson", "p"] = "kimura"
+    ml_model: Literal["LG+G4", "MFP"] = "LG+G4"
+    # Réplicats de bootstrap pour Neighbor-Joining (IQ-TREE : 1 000 UFBoot et SH-aLRT)
+    replicates: Literal[100, 200, 500] = 100
 
 
-@router.post("/{job_id}/tree")
-def tree(job_id: str, payload: TreeRequest):
-    """
-    Arbre phylogénétique de la référence et des homologues choisis, à partir de
-    l'alignement d'une analyse terminée (calcul en file, quelques secondes).
-    """
+def _explorer_result(job_id: str) -> dict:
     parent = jobs.get(job_id)
     if not parent or parent["kind"] != "explorer":
         raise HTTPException(404, "Analyse introuvable.")
     if parent["status"] != "succeeded":
         raise HTTPException(409, "L'analyse n'est pas terminée.")
-    known = {m["accession"] for m in parent["result"]["msa"]}
-    ids = sorted({i for i in payload.ids if i in known})
+    return parent["result"]
+
+
+@router.get("/phylogeny-tools")
+def phylogeny_tools():
+    """Méthodes de reconstruction disponibles : Neighbor-Joining toujours, IQ-TREE s'il est installé."""
+    return {"nj": {"available": True, "replicates": [100, 200, 500]}, "ml": iqtree_service.availability(), "strategies": tree_selection_service.STRATEGIES}
+
+
+@router.get("/{job_id}/tree/selection")
+def tree_selection(
+    job_id: str,
+    strategy: Literal["closest", "taxonomic", "diversity"] = "closest",
+    count: int = Query(50, ge=3, le=explorer_service.MAX_TREE_SELECTION),
+):
+    """Aperçu des homologues que retiendrait une stratégie, avant de construire l'arbre."""
+    return tree_selection_service.select_sequences(_explorer_result(job_id), strategy, count)
+
+
+@router.post("/{job_id}/tree")
+def tree(job_id: str, payload: TreeRequest):
+    """
+    Arbre phylogénétique de la référence et des homologues retenus par une
+    stratégie (ou choisis un à un), à partir de l'alignement d'une analyse
+    terminée : Neighbor-Joining (secondes) ou IQ-TREE (minutes).
+    """
+    result = _explorer_result(job_id)
+    if payload.strategy == "custom" and not payload.ids:
+        raise HTTPException(400, "Choisissez les homologues de l'arbre.")
+    if payload.method == "ml" and not iqtree_service.availability()["available"]:
+        raise HTTPException(400, iqtree_service.availability()["help"])
+    selection = tree_selection_service.select_sequences(result, payload.strategy, payload.count, payload.ids)
+    ids = sorted(selection.pop("ids"))
     if len(ids) < 3:
         raise HTTPException(400, "Choisissez au moins 3 homologues de l'alignement.")
-    params = {"job": job_id, "ids": ids, "model": payload.model, "version": explorer_service.METHOD_VERSION}
-    return jobs.submit("explorer_tree", params)
+    params = {
+        "job": job_id,
+        "ids": ids,
+        "method": payload.method,
+        "model": payload.model,
+        "replicates": payload.replicates if payload.method == "nj" else iqtree_service.UFBOOT_REPLICATES,
+        "selection": selection,
+        "version": explorer_service.METHOD_VERSION,
+    }
+    if payload.method == "ml":
+        params["ml_model"] = payload.ml_model
+    # La description de la sélection n'influe pas sur l'arbre : hors de l'empreinte
+    key = {k: v for k, v in params.items() if k != "selection"}
+    return jobs.submit("explorer_tree", params, key_params=key)
 
 
 @cached("explorer:homologs", ttl=7 * 24 * 3600, store_if=is_successful)

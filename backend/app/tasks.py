@@ -43,7 +43,9 @@ def _runners() -> dict[str, Callable[[dict], dict]]:
         "explorer": lambda p: run_explorer(
             p["fasta"], p.get("reference", 0), p.get("accession"), p.get("expand", False), p.get("keep"), p.get("qc")
         ),
-        "explorer_tree": lambda p: run_explorer_tree(p["job"], p["ids"], p.get("model", "kimura")),
+        "explorer_tree": lambda p: run_explorer_tree(
+            p["job"], p["ids"], p.get("model", "kimura"), p.get("method", "nj"), p.get("ml_model"), p.get("replicates", 100), p.get("selection")
+        ),
         "protein_comparison": lambda p: compare_proteins(p["accessions"], p.get("reference", 0)),
         "structure_prediction": lambda p: predict_structure(
             p["sequence"],

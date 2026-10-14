@@ -17,7 +17,7 @@ import re
 
 import numpy as np
 
-from app import http
+from app import http, provenance
 
 TAXONOMY_SEARCH = "https://rest.uniprot.org/taxonomy/search"
 
@@ -340,48 +340,148 @@ def choose_rank(lineages: list[dict[str, str] | None]) -> tuple[str, str] | None
 # Limites d'interprétation
 # ---------------------------------------------------------------------------
 
-def interpretation_limits(n: int, replicates: int, d: dict) -> tuple[str, list[str]]:
-    """Fiabilité de l'arbre (« correcte », « prudence », « insuffisante ») et limites à signaler."""
-    limits, severe = [], False
-    if n < 8:
-        limits.append(f"Seulement {n} séquences : la topologie est très incertaine ; ajoutez des homologues.")
-        severe = severe or n < 6
-    if d["informative_sites"] < 50:
-        limits.append(
-            f"Seulement {d['informative_sites']} site(s) informatif(s) (au moins deux acides aminés partagés chacun par "
-            "deux séquences) : trop peu de signal pour ordonner les embranchements."
+STATUS_ORDER = {"ok": 0, "attention": 1, "probleme": 2}
+LEVEL = {"ok": "correcte", "attention": "prudence", "probleme": "insuffisante"}
+
+
+def _check(identifier: str, label: str, value: str, status: str, text: str) -> dict:
+    return {"id": identifier, "label": label, "value": value, "status": status, "text": text}
+
+
+def _worst(checks: list[dict]) -> str:
+    return max((c["status"] for c in checks), key=STATUS_ORDER.get, default="ok")
+
+
+def data_quality(n: int, d: dict, groups: int | None = None, identity_range: list[float] | None = None) -> dict:
+    """
+    Qualité des données de l'arbre : nombre de séquences, signal (positions
+    informatives), recouvrement, saturation, divergence, diversité taxonomique.
+    Indépendante de la méthode de reconstruction.
+    """
+    columns = max(d["columns"], 1)
+    informative = d["informative_sites"]
+    checks = [
+        _check(
+            "sequences", "Séquences", f"{n} (référence comprise)",
+            "probleme" if n < 6 else "attention" if n < 8 else "ok",
+            "Moins de 8 séquences : peu d’embranchements, topologie très incertaine." if n < 8 else "Assez de séquences pour ordonner les embranchements.",
+        ),
+        _check(
+            "informative", "Positions informatives", f"{informative} sur {d['columns']} colonnes ({round(100 * informative / columns)} %)",
+            "probleme" if informative < 20 else "attention" if informative < 50 else "ok",
+            "Position informative : au moins deux acides aminés présents chacun dans au moins deux séquences. "
+            + ("Trop peu de signal pour ordonner les embranchements." if informative < 50 else "Signal suffisant."),
+        ),
+    ]
+    if d.get("mean_overlap") is not None:
+        overlap = d["mean_overlap"]
+        checks.append(
+            _check(
+                "overlap", "Recouvrement des séquences", f"{round(overlap * 100)} % de positions communes en moyenne",
+                "probleme" if overlap < 0.4 else "attention" if overlap < 0.6 else "ok",
+                "Fragments ou domaines différents : distances et vraisemblances calculées sur peu de sites."
+                if overlap < 0.6 else "Les séquences couvrent les mêmes régions.",
+            )
         )
-        severe = severe or d["informative_sites"] < 20
-    if d["saturated_fraction"] > 0.05:
-        limits.append(
-            f"{round(d['saturated_fraction'] * 100)} % des paires sont trop divergentes ou se recouvrent trop peu : "
-            "distance plafonnée, longueurs des branches longues non fiables."
+    saturation = d["saturated_fraction"]
+    checks.append(
+        _check(
+            "saturation", "Saturation", f"{round(saturation * 100)} % des paires trop divergentes",
+            "probleme" if saturation > 0.2 else "attention" if saturation > 0.05 else "ok",
+            "Distances plafonnées : longueurs des branches longues non fiables, alignement douteux entre séquences éloignées."
+            if saturation > 0.05 else "Pas de saturation notable des substitutions.",
         )
-    if d["mean_overlap"] is not None and d["mean_overlap"] < 0.6:
-        limits.append(
-            f"Les séquences ne partagent en moyenne que {round(d['mean_overlap'] * 100)} % de positions alignées : "
-            "fragments ou domaines différents, distances calculées sur peu de sites."
+    )
+    median = d.get("median_identity")
+    if median is not None:
+        span = f" (de {round(identity_range[0] * 100)} à {round(identity_range[1] * 100)} %)" if identity_range else ""
+        status = "attention" if median > 0.9 or median < 0.25 else "ok"
+        text = (
+            "Séquences très proches : peu de substitutions, arbre peu résolu." if median > 0.9
+            else "Séquences très divergentes : saturation probable et alignement moins sûr." if median < 0.25
+            else "Divergence adaptée à la reconstruction."
         )
-    if d["strong_fraction"] is not None and d["strong_fraction"] < 0.3:
-        limits.append(
-            f"{round(d['strong_fraction'] * 100)} % seulement des embranchements ont un bootstrap ≥ 70 % : l'ordre des "
-            "branchements internes n'est pas établi ; ne lisez que les groupes soutenus."
+        checks.append(_check("divergence", "Identité avec la référence", f"médiane {round(median * 100)} %{span}", status, text))
+    if d.get("masked_columns"):
+        checks.append(
+            _check("masked", "Colonnes exclues", f"{d['masked_columns']} colonne(s) masquée(s) par le contrôle qualité", "ok", "Colonnes peu fiables retirées avant la reconstruction.")
         )
-        severe = severe or d["strong_fraction"] < 0.1
-    if not replicates:
-        limits.append("Aucun réplicat de bootstrap : la robustesse des branches n'est pas évaluée.")
-    if d["median_identity"] is not None and d["median_identity"] > 0.9:
-        limits.append(
-            f"Séquences très proches de la référence (identité médiane {round(d['median_identity'] * 100)} %) : "
-            "peu de substitutions, arbre peu résolu."
+    if groups is not None:
+        single = groups <= 1 and n >= 8
+        checks.append(
+            _check(
+                "taxonomy", "Diversité taxonomique", f"{groups} groupe(s) d’organismes",
+                "attention" if single else "ok",
+                "Un seul groupe d’organismes : l’arbre ne dit rien des relations entre lignées." if single else "Plusieurs lignées représentées.",
+            )
         )
-    if d["median_identity"] is not None and d["median_identity"] < 0.25:
-        limits.append(
-            f"Séquences très divergentes (identité médiane {round(d['median_identity'] * 100)} %) : saturation des "
-            "substitutions et alignement moins sûr."
-        )
-    level = "insuffisante" if severe else "prudence" if limits else "correcte"
-    return level, limits
+    status = _worst(checks)
+    return {"level": LEVEL[status], "status": status, "checks": checks, "limits": [c["text"] for c in checks if c["status"] != "ok"]}
+
+
+def robustness(method: str, supports: dict[int, float], alrt: dict[int, float] | None, replicates: int, internal_branches: int) -> dict:
+    """
+    Robustesse phylogénétique : soutien des embranchements par le bootstrap
+    (Neighbor-Joining) ou par UFBoot et SH-aLRT (IQ-TREE). La proportion de
+    branches à support ≥ 70 % est toujours donnée ; le seuil recommandé dépend
+    de la mesure (70 % pour le bootstrap classique, 95 % pour UFBoot).
+    """
+    values = list(supports.values())
+    total = internal_branches or len(values)
+    at_70 = sum(v >= 0.70 for v in values)
+    if method == "ml":
+        recommended = {"label": "UFBoot ≥ 95 % et SH-aLRT ≥ 80 %", "ufboot": 0.95, "alrt": 0.80}
+        robust = sum(1 for split, v in supports.items() if v >= 0.95 and (alrt or {}).get(split, 0) >= 0.80)
+        measure = f"UFBoot (bootstrap ultrarapide) et SH-aLRT, {replicates} réplicats chacun"
+    else:
+        recommended = {"label": "bootstrap ≥ 70 %", "bootstrap": 0.70}
+        robust = at_70
+        measure = f"Bootstrap non paramétrique, {replicates} réplicats"
+    bins = [("< 50 %", 0, 0.5), ("50–70 %", 0.5, 0.7), ("70–95 %", 0.7, 0.95), ("≥ 95 %", 0.95, 1.01)]
+    histogram = [{"label": label, "count": sum(lo <= v < hi for v in values)} for label, lo, hi in bins]
+    fraction_robust = robust / total if total else None
+    limits = []
+    if not replicates or not values:
+        status = "probleme"
+        limits.append("Aucun support des branches : la robustesse de l’arbre n’est pas évaluée.")
+    else:
+        status = "ok" if fraction_robust >= 0.5 else "attention" if fraction_robust >= 0.2 else "probleme"
+        if status != "ok":
+            limits.append(
+                f"{robust} embranchement(s) sur {total} atteignent le seuil recommandé ({recommended['label']}) : "
+                "l’ordre des branchements internes n’est pas établi ; ne lisez que les groupes soutenus."
+            )
+        if method == "ml":
+            limits.append("Avec UFBoot, un support de 70 à 95 % reste faible : seuls les groupes à ≥ 95 % (et SH-aLRT ≥ 80 %) sont bien soutenus.")
+    return {
+        "level": LEVEL[status],
+        "status": status,
+        "measure": measure,
+        "replicates": replicates,
+        "internal_branches": total,
+        "supported_70": at_70,
+        "fraction_70": round(at_70 / total, 3) if total else None,
+        "recommended": recommended,
+        "robust": robust,
+        "fraction_recommended": round(fraction_robust, 3) if fraction_robust is not None else None,
+        "mean_support": round(float(np.mean(values)), 3) if values else None,
+        "histogram": histogram,
+        "limits": limits,
+    }
+
+
+def _annotate_extra(node: dict, values: dict[int, float], n_leaves: int, key: str) -> int:
+    """Second support (SH-aLRT) sur les nœuds internes, par bipartition."""
+    if "leaf" in node:
+        return 1 << node["leaf"]
+    mask = 0
+    for child in node["children"]:
+        mask |= _annotate_extra(child, values, n_leaves, key)
+    full = (1 << n_leaves) - 1
+    split = mask if not mask & 1 else full & ~mask
+    if split in values:
+        node[key] = values[split]
+    return mask
 
 
 # ---------------------------------------------------------------------------
@@ -398,12 +498,18 @@ def build_tree(
     lineages: dict[int, dict[str, str]] | None = None,
     model: str = DEFAULT_MODEL,
     mask: list[bool] | None = None,
+    method: str = "nj",
+    ml_model: str | None = None,
+    selection: dict | None = None,
 ) -> dict | None:
     """
-    Arbre Neighbor-Joining de la séquence étudiée et des homologues affichés
-    dans l'alignement. `msa` : lignes {accession, organism, row}. `mask` :
+    Arbre de la séquence étudiée et des homologues donnés : Neighbor-Joining
+    (rapide, `method="nj"`) ou maximum de vraisemblance avec IQ-TREE
+    (`method="ml"`). `msa` : lignes {accession, organism, row}. `mask` :
     colonnes exclues (contrôle qualité de l'alignement).
     """
+    from app.services import iqtree_service
+
     if len(msa) + 1 < MIN_SEQUENCES:
         return None
     model = model if model in MODELS else DEFAULT_MODEL
@@ -437,21 +543,36 @@ def build_tree(
 
     onehot, present = _encode(rows)
     distances = kimura_distances(onehot, present, model=model)
-    edges = neighbor_joining(distances)
-
-    # Bootstrap : colonnes tirées avec remise
-    rng = np.random.default_rng(seed)
     length = len(rows[0])
-    counts: dict[int, int] = {}
-    reference = splits(edges, n)
-    for _ in range(replicates):
-        weights = np.bincount(rng.integers(0, length, length), minlength=length)
-        for split in splits(neighbor_joining(kimura_distances(onehot, present, weights, model)), n) & reference:
-            counts[split] = counts.get(split, 0) + 1
-    supports = {s: counts.get(s, 0) / replicates for s in reference} if replicates else {}
+    alrt: dict[int, float] = {}
+    ml = None
+    if method == "ml":
+        provenance.mark("Reconstruction par maximum de vraisemblance (IQ-TREE)", ml_model or iqtree_service.DEFAULT_ML_MODEL)
+        ml = iqtree_service.run_iqtree(rows, ml_model or iqtree_service.DEFAULT_ML_MODEL, seed=seed)
+        provenance.record_tool("IQ-TREE", ml["version"], ml["command"])
+        edges, labels = iqtree_service.parse_newick(ml["newick"], ml["names"])
+        supports, alrt = iqtree_service.split_supports(edges, labels, n)
+        reference = splits(edges, n)
+        replicates = iqtree_service.UFBOOT_REPLICATES
+    else:
+        provenance.mark("Reconstruction par Neighbor-Joining", MODELS[model]["label"])
+        edges = neighbor_joining(distances)
+        # Bootstrap : colonnes tirées avec remise
+        provenance.mark("Bootstrap", f"{replicates} réplicats")
+        rng = np.random.default_rng(seed)
+        counts: dict[int, int] = {}
+        reference = splits(edges, n)
+        for _ in range(replicates):
+            weights = np.bincount(rng.integers(0, length, length), minlength=length)
+            for split in splits(neighbor_joining(kimura_distances(onehot, present, weights, model)), n) & reference:
+                counts[split] = counts.get(split, 0) + 1
+        supports = {s: counts.get(s, 0) / replicates for s in reference} if replicates else {}
 
+    provenance.mark("Enracinement, groupes taxonomiques et diagnostics")
     root = midpoint_root(edges, n)
     _annotate(root, supports, n)
+    if alrt:
+        _annotate_extra(root, alrt, n, "support_alrt")
 
     # Groupes taxonomiques
     # Lignées déjà connues (Explorateur) : seules les espèces manquantes sont demandées
@@ -483,17 +604,37 @@ def build_tree(
         "strong_fraction": round(sum(v >= STRONG_SUPPORT for v in supports.values()) / len(supports), 3) if supports else None,
         "internal_branches": len(reference),
     }
-    level, limits = interpretation_limits(n, replicates, diagnostics)
+    identity_range = [round(min(identities), 3), round(max(identities), 3)] if identities else None
+    quality = data_quality(n, diagnostics, len(groups) if groups else None, identity_range)
+    robust = robustness(method, supports, alrt, replicates, len(reference))
+    worst = max(quality["status"], robust["status"], key=STATUS_ORDER.get)
+
+    if method == "ml":
+        description = f"Maximum de vraisemblance (IQ-TREE {ml['version']}, modèle {ml['model']}), racine au point médian"
+        reconstruction = f"Maximum de vraisemblance, IQ-TREE {ml['version']} (Minh et al., 2020)"
+        chosen = f" Modèle retenu : {ml['model']}." if ml["requested_model"] == "MFP" else ""
+        model_info = {"id": ml["model"], "label": ml["model"], "formula": "", "text": iqtree_service.ML_MODELS[ml["requested_model"]]["text"] + chosen}
+        support = {"method": "UFBoot2 (Hoang et al., 2018) et SH-aLRT (Guindon et al., 2010)", "replicates": replicates, "strong": iqtree_service.UFBOOT_THRESHOLD}
+    else:
+        description = f"Distances {MODELS[model]['label']} + Neighbor-Joining, racine au point médian"
+        reconstruction = "Neighbor-Joining (Saitou & Nei, 1987), méthode de distances"
+        model_info = {"id": model, **MODELS[model]}
+        support = {"method": "Bootstrap non paramétrique (Felsenstein, 1985)", "replicates": replicates, "strong": STRONG_SUPPORT}
 
     return {
-        "method": f"Distances {MODELS[model]['label']} + Neighbor-Joining, racine au point médian",
-        "reconstruction": "Neighbor-Joining (Saitou & Nei, 1987), méthode de distances",
-        "model": {"id": model, **MODELS[model]},
+        "method": description,
+        "method_id": method,
+        "reconstruction": reconstruction,
+        "model": model_info,
         "rooting": "Point médian du plus long chemin entre deux séquences (pas de groupe externe)",
-        "support": {"method": "Bootstrap non paramétrique (Felsenstein, 1985)", "replicates": replicates, "strong": STRONG_SUPPORT},
+        "support": support,
+        "ml": {k: v for k, v in ml.items() if k not in ("newick", "names")} if ml else None,
+        "selection": selection,
+        "data_quality": quality,
+        "robustness": robust,
         "diagnostics": diagnostics,
-        "reliability": level,
-        "limits": limits,
+        "reliability": LEVEL[worst],
+        "limits": quality["limits"] + robust["limits"],
         "bootstrap_replicates": replicates,
         "leaf_count": n,
         "max_distance": ceiling,
