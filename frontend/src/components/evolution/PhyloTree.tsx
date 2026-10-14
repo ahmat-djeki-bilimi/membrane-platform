@@ -141,7 +141,7 @@ export default function PhyloTree({
           {colorMode === "group" && (
             <label className="flex items-center gap-1.5 text-[13px] text-slate-700">
               Rang
-              <select value={rank} onChange={(e) => setRank(e.target.value)} className="rounded-md border border-slate-300 px-2 py-1 text-[13px] outline-none focus:border-blue-500">
+              <select value={rank} onChange={(e) => setRank(e.target.value)} className="rounded-xl border border-slate-300 px-2 py-1 text-[13px] outline-none focus:border-blue-500">
                 {TREE_RANKS.map((r) => (
                   <option key={r.rank} value={r.rank}>
                     {r.label}
@@ -168,7 +168,7 @@ export default function PhyloTree({
         </div>
       </div>
 
-      <div ref={containerRef} className="relative overflow-y-auto rounded-md border border-slate-200" style={{ maxHeight }}>
+      <div ref={containerRef} className="relative overflow-y-auto rounded-lg border border-slate-200" style={{ maxHeight }}>
         <svg
           ref={svgRef}
           width={width}
@@ -291,7 +291,7 @@ export default function PhyloTree({
               >
                 <rect x={0} y={top + row * ROW_PX} width={width} height={ROW_PX} fill="transparent" />
                 {colorMode !== "none" && <rect x={labelX} y={y - 5} width={10} height={10} rx={2} fill={coloring.colorOf(leaf)} />}
-                <text x={labelX + (colorMode !== "none" ? 16 : 0)} y={y + 4.5} fontSize={13} fill={leaf.is_query ? "#0f4c81" : "#1e293b"}>
+                <text x={labelX + (colorMode !== "none" ? 16 : 0)} y={y + 4.5} fontSize={13} fill={leaf.is_query ? "#4338ca" : "#1e293b"}>
                   <tspan fontStyle="italic" fontWeight={leaf.is_query ? 700 : 400}>
                     {truncate(organismName(leaf.organism) ?? (leaf.is_query ? "Protéine étudiée" : leaf.id), 30)}
                   </tspan>
@@ -321,7 +321,7 @@ export default function PhyloTree({
 
         {hoveredLeaf && hoveredRow >= 0 && (
           <div
-            className="pointer-events-none absolute z-10 max-w-[360px] rounded-md border border-slate-200 bg-white px-3 py-2 text-[13px] shadow-lg"
+            className="pointer-events-none absolute z-10 max-w-[360px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] shadow-lg"
             style={{ top: top + (hoveredRow + 1) * ROW_PX + 4, right: 12 }}
           >
             <p className="font-semibold italic text-slate-900">{hoveredLeaf.organism ?? (hoveredLeaf.is_query ? "Protéine étudiée" : hoveredLeaf.id)}</p>
@@ -378,7 +378,7 @@ function ExportButton({ label, title, onClick }: { label: string; title: string;
     <button
       onClick={onClick}
       title={title}
-      className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
+      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
     >
       <Download size={13} />
       {label}

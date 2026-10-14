@@ -194,7 +194,7 @@ export default function HomologsTab({
         </p>
       )}
 
-      <section className="rounded-lg border border-slate-200 bg-white">
+      <section className="card">
         <div className="border-b border-slate-100 px-4 py-2.5">
           <h3 className="text-[16px] font-semibold text-slate-900">Sélection des homologues</h3>
           <p className="text-[13px] text-slate-500">
@@ -229,7 +229,7 @@ export default function HomologsTab({
               value={filters.text}
               onChange={(e) => update({ text: e.target.value })}
               placeholder="Espèce, identifiant, protéine…"
-              className="w-full rounded-md border border-slate-300 px-2 py-1 text-[13px] outline-none focus:border-blue-500"
+              className="w-full rounded-xl border border-slate-300 px-2 py-1 text-[13px] outline-none focus:border-blue-500"
             />
             <label className="flex items-center gap-2 text-[13px] text-slate-700">
               <input type="checkbox" checked={filters.onePerSpecies} onChange={(e) => update({ onePerSpecies: e.target.checked })} />
@@ -250,7 +250,7 @@ export default function HomologsTab({
               <select
                 value={filters.threshold}
                 onChange={(e) => update({ threshold: Number(e.target.value) })}
-                className="rounded-md border border-slate-300 px-2 py-1 text-[13px] outline-none focus:border-blue-500"
+                className="rounded-xl border border-slate-300 px-2 py-1 text-[13px] outline-none focus:border-blue-500"
               >
                 {THRESHOLDS.map((t) => (
                   <option key={t} value={t}>
@@ -286,7 +286,7 @@ export default function HomologsTab({
           <div className="ml-auto flex flex-wrap gap-2">
             <button
               onClick={reset}
-              className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-[13px] font-semibold text-slate-700 hover:bg-slate-100"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-[13px] font-semibold text-slate-700 hover:bg-slate-100"
             >
               <RotateCcw size={13} />
               Revenir à l’analyse affichée
@@ -294,7 +294,7 @@ export default function HomologsTab({
             <button
               onClick={() => downloadText(`${(result.reference.accession ?? result.reference.id).replace(/[^\w.-]+/g, "_")}_selection.fasta`, selectionFasta(result, selectedIndices.map((k) => pool[k])))}
               disabled={!count}
-              className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-[13px] font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-[13px] font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40"
             >
               <Download size={13} />
               Sélection (FASTA)
@@ -304,7 +304,7 @@ export default function HomologsTab({
                 onClick={apply}
                 disabled={!count || unchanged || waiting || applying}
                 title={unchanged ? "La sélection est celle de l’analyse affichée" : undefined}
-                className="inline-flex items-center gap-1.5 rounded-md bg-[#0f4c81] px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-[#0c3d68] disabled:cursor-not-allowed disabled:opacity-40"
+                className="btn-primary gap-1.5 px-3 py-1.5 text-[13px] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {applying ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
                 Relancer l’analyse avec {count} homologue(s)
@@ -331,7 +331,7 @@ export default function HomologsTab({
         onTaxon={(taxon) => update({ taxon })}
       />
 
-      <section className="rounded-lg border border-slate-200 bg-white">
+      <section className="card">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
           <h3 className="text-[16px] font-semibold text-slate-900">Homologues : {list.length} affiché(s)</h3>
           <div className="flex flex-wrap items-center gap-2">
@@ -475,7 +475,7 @@ export default function HomologsTab({
         )}
       </section>
 
-      <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 lg:grid-cols-[1fr_320px]">
+      <section className="grid gap-4 card p-4 lg:grid-cols-[1fr_320px]">
         <div>
           <h3 className="text-[16px] font-semibold text-slate-900">Composition de la famille</h3>
           <p className="mt-1 text-[14px] leading-6 text-slate-600">
@@ -492,7 +492,7 @@ export default function HomologsTab({
             un autre homologue, sur les positions alignées des deux séquences.
           </p>
           {result.input.excluded.length > 0 && (
-            <details className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-2 text-[13px]">
+            <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2 text-[13px]">
               <summary className="cursor-pointer font-semibold text-slate-700">
                 {result.input.excluded.length} séquence(s) écartée(s) à l’alignement
               </summary>
@@ -556,7 +556,7 @@ function NumberField({
         min={min}
         max={max}
         onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
-        className="w-16 rounded-md border border-slate-300 px-1.5 py-1 text-right text-[13px] tabular-nums outline-none focus:border-blue-500"
+        className="w-16 rounded-xl border border-slate-300 px-1.5 py-1 text-right text-[13px] tabular-nums outline-none focus:border-blue-500"
       />
       {suffix}
     </label>

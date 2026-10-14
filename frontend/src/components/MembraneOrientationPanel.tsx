@@ -149,7 +149,7 @@ export default function MembraneOrientationPanel({
 
   if (loadingOpm) {
     return (
-      <div className="flex h-[300px] items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white text-[14px] text-slate-500">
+      <div className="flex h-[300px] items-center justify-center gap-2 card text-[14px] text-slate-500">
         <Loader2 size={15} className="animate-spin text-cyan-600" />
         Interrogation d’OPM pour {pdbId.toUpperCase()}…
       </div>
@@ -159,10 +159,10 @@ export default function MembraneOrientationPanel({
   return (
     <div className="space-y-4">
       {opmOk && opm ? (
-        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <section className="overflow-hidden card">
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-4 py-3">
             <div className="flex items-start gap-2.5">
-              <span className="mt-0.5 rounded-md bg-cyan-600 p-2 text-white shadow-sm">
+              <span className="mt-0.5 rounded-lg bg-cyan-600 p-2 text-white shadow-sm">
                 <Waves size={16} />
               </span>
               <div>
@@ -183,7 +183,7 @@ export default function MembraneOrientationPanel({
               href={opm.url}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 rounded-md bg-cyan-600 px-3 py-1.5 text-[14px] font-semibold text-white hover:bg-cyan-700"
+              className="inline-flex items-center gap-1 rounded-lg bg-cyan-600 px-3 py-1.5 text-[14px] font-semibold text-white hover:bg-cyan-700"
             >
               Fiche OPM
               <ExternalLink size={13} />
@@ -423,9 +423,9 @@ function UniProtTopology({
   const length = orientation?.sequence_length || 0;
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white">
+    <section className="card">
       <div className="flex items-center gap-2.5 border-b border-slate-100 px-4 py-3">
-        <span className="rounded-md bg-amber-500 p-2 text-white shadow-sm">
+        <span className="rounded-lg bg-amber-500 p-2 text-white shadow-sm">
           <Layers size={16} />
         </span>
         <div>
@@ -458,7 +458,7 @@ function UniProtTopology({
             {o.interpretation && <p className="text-[14px] leading-5 text-slate-600">{o.interpretation}</p>}
           </div>
           <div>
-            <div className="max-h-[220px] overflow-auto rounded-md border border-slate-200">
+            <div className="max-h-[220px] overflow-auto rounded-lg border border-slate-200">
               {segments.length ? (
                 <table className="w-full text-[14px]">
                   <tbody>
@@ -527,7 +527,7 @@ function SecondaryList({ items }: { items: { pdb_id: string; resolution: string 
 
 function Section({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="rounded-md border border-slate-200 p-3">
+    <div className="rounded-lg border border-slate-200 p-3">
       <h3 className="mb-2 flex items-center gap-1.5 text-[14px] font-semibold text-slate-900">
         {icon}
         {title}
@@ -581,7 +581,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 function BigMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-cyan-100 bg-cyan-50 px-3 py-2">
+    <div className="rounded-lg border border-cyan-100 bg-cyan-50 px-3 py-2">
       <dt className="text-[12px] font-semibold uppercase tracking-[0.08em] text-cyan-800">{label}</dt>
       <dd className="text-[20px] font-bold text-slate-900">{value}</dd>
     </div>
@@ -590,7 +590,7 @@ function BigMetric({ label, value }: { label: string; value: string }) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
       <dt className="text-[12px] font-medium uppercase tracking-[0.08em] text-slate-500">{label}</dt>
       <dd className="truncate text-[15px] font-semibold text-slate-900" title={value}>
         {value}
@@ -601,7 +601,7 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 function Notice({ children }: { children: React.ReactNode }) {
   return (
-    <p className="rounded-lg border border-slate-200 bg-white p-4 text-[14px] text-slate-600">{children}</p>
+    <p className="card p-4 text-[14px] text-slate-600">{children}</p>
   );
 }
 

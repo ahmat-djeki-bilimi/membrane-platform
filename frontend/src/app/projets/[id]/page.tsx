@@ -22,7 +22,7 @@ const KIND = {
 
 export default function ProjectPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-[#eef2f6] text-slate-900">
+    <div className="flex min-h-screen flex-col app-bg text-slate-900">
       <SiteHeader active="projects" />
       <RequireAuth>
         <ProjectContent />
@@ -119,7 +119,7 @@ function ProjectContent() {
       <section className={HERO_BG}>
         <div aria-hidden className={HERO_GLOW} />
         <div className="relative px-4 py-6 lg:px-6">
-          <nav className="flex items-center gap-1 text-[13px] text-blue-200">
+          <nav className="flex items-center gap-1 text-[13px] text-indigo-200">
             <Link href="/projets" className="hover:text-white">
               Mes projets
             </Link>
@@ -132,7 +132,7 @@ function ProjectContent() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 maxLength={120}
-                className="w-full rounded-md px-3 py-2 text-[18px] font-semibold text-slate-900 outline-none"
+                className="w-full rounded-lg px-3 py-2 text-[18px] font-semibold text-slate-900 outline-none"
               />
               <textarea
                 value={description}
@@ -140,13 +140,13 @@ function ProjectContent() {
                 rows={2}
                 maxLength={5000}
                 placeholder="Description"
-                className="w-full rounded-md px-3 py-2 text-[15px] text-slate-900 outline-none"
+                className="w-full rounded-lg px-3 py-2 text-[15px] text-slate-900 outline-none"
               />
               <div className="flex gap-2">
-                <button onClick={save} disabled={!name.trim()} className="rounded-md bg-white px-3 py-1.5 text-[14px] font-semibold text-[#0f4c81] disabled:opacity-50">
+                <button onClick={save} disabled={!name.trim()} className="rounded-lg bg-white px-3 py-1.5 text-[14px] font-semibold text-indigo-700 disabled:opacity-50">
                   Enregistrer
                 </button>
-                <button onClick={() => setEditing(false)} className="rounded-md px-3 py-1.5 text-[14px] text-white hover:bg-white/10">
+                <button onClick={() => setEditing(false)} className="rounded-lg px-3 py-1.5 text-[14px] text-white hover:bg-white/10">
                   Annuler
                 </button>
               </div>
@@ -155,18 +155,18 @@ function ProjectContent() {
             <div className="mt-1 flex flex-wrap items-end justify-between gap-3">
               <div>
                 <h1 className="text-[28px] font-bold text-white">{project.name}</h1>
-                {project.description && <p className="max-w-[80ch] text-[15px] text-blue-100">{project.description}</p>}
+                {project.description && <p className="max-w-[80ch] text-[15px] text-indigo-100">{project.description}</p>}
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => setEditing(true)}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-white/25 bg-white/10 px-3 py-2 text-[14px] text-white hover:bg-white/20"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/25 bg-white/10 px-3 py-2 text-[14px] text-white hover:bg-white/20"
                 >
                   <Pencil size={14} />
                   Modifier
                 </button>
                 {confirmDelete ? (
-                  <span className="inline-flex items-center gap-2 rounded-md bg-rose-600 px-3 py-2 text-[14px] text-white">
+                  <span className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-3 py-2 text-[14px] text-white">
                     Supprimer le projet et ses analyses ?
                     <button onClick={removeProject} className="font-semibold underline">
                       Oui
@@ -178,7 +178,7 @@ function ProjectContent() {
                 ) : (
                   <button
                     onClick={() => setConfirmDelete(true)}
-                    className="inline-flex items-center gap-1.5 rounded-md border border-white/25 bg-white/10 px-3 py-2 text-[14px] text-white hover:bg-rose-600"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/25 bg-white/10 px-3 py-2 text-[14px] text-white hover:bg-rose-600"
                   >
                     <Trash2 size={14} />
                     Supprimer
@@ -205,9 +205,9 @@ function ProjectContent() {
               const kind = KIND[a.kind];
               const payload = a.payload as Record<string, string | number>;
               return (
-                <li key={a.id} className="flex flex-col rounded-lg border border-slate-200 bg-white p-4">
+                <li key={a.id} className="flex flex-col card p-4">
                   <div className="flex items-start gap-3">
-                    <span className={`rounded-md p-2 text-white ${kind.color}`}>{kind.icon}</span>
+                    <span className={`rounded-lg p-2 text-white ${kind.color}`}>{kind.icon}</span>
                     <div className="min-w-0 flex-1">
                       <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-slate-500">{kind.label}</p>
                       <p className="truncate text-[16px] font-semibold text-slate-900" title={a.title}>
@@ -228,14 +228,14 @@ function ProjectContent() {
                     <div className="flex gap-1.5">
                       <button
                         onClick={() => removeAnalysis(a)}
-                        className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                        className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
                         title="Retirer du projet"
                       >
                         <Trash2 size={15} />
                       </button>
                       <button
                         onClick={() => open(a)}
-                        className="inline-flex items-center gap-1 rounded-md bg-[#0f4c81] px-2.5 py-1 text-[13px] font-semibold text-white hover:bg-[#0c3d68]"
+                        className="btn-primary gap-1 px-2.5 py-1 text-[13px]"
                       >
                         Ouvrir
                         <ArrowRight size={14} />

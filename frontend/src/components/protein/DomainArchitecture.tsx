@@ -193,7 +193,7 @@ export default function DomainArchitecture({
 
       {tip && (
         <div
-          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[13px] shadow-md"
+          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[13px] shadow-md"
           style={{ left: `${(tip.x / W) * 100}%`, top: `${(tip.y / H) * 100}%` }}
         >
           <p className="font-semibold text-slate-900">{tip.title}</p>

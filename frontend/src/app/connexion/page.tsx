@@ -51,20 +51,20 @@ function ConnexionContent() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#eef2f6] text-slate-900">
+    <div className="flex min-h-screen flex-col app-bg text-slate-900">
       <SiteHeader />
       <section className={HERO_BG}>
         <div aria-hidden className={HERO_GLOW} />
         <div className="relative px-4 py-6 lg:px-6">
           <h1 className="text-[28px] font-bold text-white">Votre espace MemProtScope</h1>
-          <p className="mt-1 text-[15px] text-blue-100">
+          <p className="mt-1 text-[15px] text-indigo-100">
             Regroupez vos analyses dans des projets et retrouvez-les à tout moment.
           </p>
         </div>
       </section>
 
       <main className="flex flex-1 items-start justify-center px-4 py-8">
-        <div className="w-full max-w-[440px] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="w-full max-w-[440px] overflow-hidden card shadow-sm">
           <div role="tablist" className="grid grid-cols-2 border-b border-slate-200">
             {(
               [
@@ -82,7 +82,7 @@ function ConnexionContent() {
                 }}
                 className={`inline-flex items-center justify-center gap-2 px-4 py-3 text-[15px] font-semibold transition ${
                   mode === key
-                    ? "border-b-2 border-[#0f4c81] text-[#0f4c81]"
+                    ? "border-b-2 border-indigo-600 text-indigo-700"
                     : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
                 }`}
               >
@@ -127,7 +127,7 @@ function ConnexionContent() {
             </Field>
 
             {error && (
-              <p role="alert" className="flex items-start gap-2 rounded-md bg-rose-50 px-3 py-2 text-[14px] text-rose-700">
+              <p role="alert" className="flex items-start gap-2 rounded-lg bg-rose-50 px-3 py-2 text-[14px] text-rose-700">
                 <AlertCircle size={16} className="mt-0.5 shrink-0" />
                 {error}
               </p>
@@ -136,7 +136,7 @@ function ConnexionContent() {
             <button
               type="submit"
               disabled={busy}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#0f4c81] px-4 py-2.5 text-[15px] font-semibold text-white hover:bg-[#0c3d68] disabled:opacity-60"
+              className="btn-primary w-full gap-2 px-4 py-2.5 text-[15px] disabled:opacity-60"
             >
               {busy && <Loader2 size={16} className="animate-spin" />}
               {mode === "login" ? "Se connecter" : "Créer mon compte"}
@@ -150,7 +150,7 @@ function ConnexionContent() {
 }
 
 const inputClass =
-  "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[15px] outline-none focus:border-[#0f4c81] focus:ring-2 focus:ring-blue-100";
+  "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-[15px] outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100";
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (

@@ -111,7 +111,7 @@ export default function AutoScientificInterpretation({
     <section className="rounded border border-slate-200 bg-white p-3 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Brain size={18} className="text-[#0f4c81]" />
+          <Brain size={18} className="text-indigo-700" />
           <div>
             <h2 className="text-[16px] font-bold text-slate-900">
               Interprétation 
@@ -173,7 +173,7 @@ export default function AutoScientificInterpretation({
         </p>
       </div>
 
-      <div className="mt-3 grid grid-cols-4 gap-2">
+      <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
         <MiniStat
           label="Segments TM"
           value={tmCount > 0 ? String(tmCount) : "-"}
@@ -405,7 +405,7 @@ function InterpretBlock({
   };
 
   return (
-    <div className={`col-span-4 rounded border p-3 ${styles[tone]}`}>
+    <div className={`col-span-12 rounded-xl border p-3 md:col-span-4 ${styles[tone]}`}>
       <div className="mb-2 flex items-center gap-2">
         {icon}
         <p className="text-[14px] font-bold">{title}</p>

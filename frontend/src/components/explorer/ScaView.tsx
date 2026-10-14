@@ -87,7 +87,7 @@ export default function ScaView({
 
       <div className={`grid gap-4 ${result.structure ? "xl:grid-cols-[1.2fr_1fr]" : ""}`}>
         {result.structure && (
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <section className="card p-4">
             <h3 className="text-[16px] font-semibold text-slate-900">Secteurs SCA sur la structure dans la membrane</h3>
             <p className="mb-2 text-[13px] text-slate-500">
               {active === null ? "Tous les secteurs ; cliquez un secteur à droite pour l’isoler." : `Secteur ${active} isolé.`}
@@ -106,7 +106,7 @@ export default function ScaView({
         )}
 
         <div className="space-y-4">
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <section className="card p-4">
             <h3 className="text-[16px] font-semibold text-slate-900">Spectre de la matrice SCA</h3>
             <p className="mb-2 text-[13px] text-slate-500">
               Chaque barre est un mode de covariation. Les modes au-dessus de la ligne (alignements aléatoires de même
@@ -115,7 +115,7 @@ export default function ScaView({
             <Spectrum values={sca.eigenvalues} threshold={sca.random_threshold} />
           </section>
 
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <section className="card p-4">
             <h3 className="text-[16px] font-semibold text-slate-900">Secteurs</h3>
             <div className="mt-2 space-y-2">
               {sectors.map((s) => (
@@ -129,7 +129,7 @@ export default function ScaView({
 
       <ScaControls sca={sca} />
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4 text-[14px] leading-6 text-slate-600">
+      <section className="card p-4 text-[14px] leading-6 text-slate-600">
         <h3 className="mb-1 text-[16px] font-semibold text-slate-900">Méthode et lecture</h3>
         <p>
           {sca.method}. La SCA pondère chaque corrélation par la conservation des deux positions, puis cherche dans la
@@ -166,7 +166,7 @@ function SectorCard({
     .map(([z, n]) => `${ZONES[z as Zone]?.label.toLowerCase() ?? z} ${n}`)
     .join(" · ");
   return (
-    <div className={`rounded-md border p-3 ${active ? "border-slate-800 bg-slate-50" : "border-slate-200"}`}>
+    <div className={`rounded-lg border p-3 ${active ? "border-slate-800 bg-slate-50" : "border-slate-200"}`}>
       <button onClick={onClick} className="flex w-full items-center gap-2 text-left text-[14px] font-semibold text-slate-900">
         <span className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
         Secteur {sector.id} · {sector.size} positions

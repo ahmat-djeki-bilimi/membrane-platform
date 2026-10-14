@@ -74,7 +74,7 @@ export default function SuperposedViewer({
   }, [ready, visible, colorMode, selectedResidues, result]);
 
   return (
-    <div className="overflow-hidden rounded-md border border-slate-200">
+    <div className="overflow-hidden rounded-lg border border-slate-200">
       <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-3 py-2 text-[13px]">
         {result.proteins.map((protein, p) => {
           const present = superposed.some((s) => s.protein === p);

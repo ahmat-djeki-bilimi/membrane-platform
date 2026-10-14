@@ -169,7 +169,7 @@ export default function SuperpositionViewer({
   const crystal = `${comparison.pdb_id} (chaîne ${comparison.chain})`;
 
   return (
-    <div className="overflow-hidden rounded-md border border-slate-200 bg-white">
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2 text-[13px]">
         <Segmented
           value={layout}
@@ -205,7 +205,7 @@ export default function SuperpositionViewer({
         <div className="ml-auto flex gap-1.5">
           <button
             onClick={() => setSpin((v) => !v)}
-            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 font-semibold ${
+            className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 font-semibold ${
               spin ? "bg-slate-800 text-white" : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
             }`}
           >
@@ -214,14 +214,14 @@ export default function SuperpositionViewer({
           </button>
           <button
             onClick={recenter}
-            className="rounded-md bg-white px-2 py-1 font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+            className="rounded-lg bg-white px-2 py-1 font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
           >
             Recentrer
           </button>
           <button
             onClick={() => downloadText(`${fileBase}_${comparison.pdb_id}_superpose.pdb`, comparison.pdb)}
             title="Chaîne expérimentale superposée, dans le repère de la membrane du modèle"
-            className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+            className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
           >
             <Download size={12} />
             PDB superposé
@@ -283,7 +283,7 @@ function Segmented<T extends string>({
   options: [T, string][];
 }) {
   return (
-    <div className="inline-flex rounded-md bg-white p-0.5 ring-1 ring-slate-200">
+    <div className="inline-flex rounded-lg bg-white p-0.5 ring-1 ring-slate-200">
       {options.map(([key, label]) => (
         <button
           key={key}

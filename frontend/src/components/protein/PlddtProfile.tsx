@@ -195,17 +195,17 @@ export default function PlddtProfile({
 
       {stats && (
         <div className="grid gap-2 sm:grid-cols-3">
-          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
             <p className="text-[12px] font-medium uppercase tracking-[0.08em] text-slate-500">Segments TM</p>
             <p className="text-[18px] font-bold text-slate-900">pLDDT {fmt(stats.tmMean)}</p>
             <p className="text-[12px] text-slate-500">confiance moyenne dans la membrane</p>
           </div>
-          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
             <p className="text-[12px] font-medium uppercase tracking-[0.08em] text-slate-500">Hors segments TM</p>
             <p className="text-[18px] font-bold text-slate-900">pLDDT {fmt(stats.otherMean)}</p>
             <p className="text-[12px] text-slate-500">boucles et extrémités</p>
           </div>
-          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
             <p className="text-[12px] font-medium uppercase tracking-[0.08em] text-slate-500">Régions peu fiables</p>
             <p className="text-[18px] font-bold text-slate-900">{stats.low.length}</p>
             <p className="text-[12px] text-slate-500">pLDDT &lt; 50 sur au moins 5 résidus</p>

@@ -56,7 +56,7 @@ export default function FunctionalAnnotation({ accession }: { accession: string 
 
   if (loading)
     return (
-      <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-4 text-[14px] text-slate-500">
+      <div className="flex items-center gap-2 card p-4 text-[14px] text-slate-500">
         <Loader2 size={15} className="animate-spin text-blue-600" />
         Chargement de l’annotation fonctionnelle (UniProt, InterPro)…
       </div>
@@ -65,10 +65,10 @@ export default function FunctionalAnnotation({ accession }: { accession: string 
 
   const s = data.summary;
   return (
-    <section className="rounded-lg border border-slate-200 bg-white">
+    <section className="card">
       <div className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 px-4 py-3">
         <div className="flex items-center gap-2.5">
-          <span className="rounded-md bg-emerald-600 p-2 text-white shadow-sm">
+          <span className="rounded-lg bg-emerald-600 p-2 text-white shadow-sm">
             <Tags size={16} />
           </span>
           <div>
@@ -83,7 +83,7 @@ export default function FunctionalAnnotation({ accession }: { accession: string 
         <Count label="Termes Gene Ontology" total={s.go.total} experimental={s.go.experimental} />
         <Count label="Résidus catalytiques et sites" total={s.sites.total} experimental={s.sites.experimental} detail={`${s.catalytic} catalytique(s), ${s.binding} de liaison`} />
         <Count label="Variants fonctionnels" total={s.functional_variants} experimental={data.variants.filter((v) => v.functional && v.experimental).length} detail={`${s.variants.total} variant(s) au total`} />
-        <div className="rounded-md bg-slate-50 px-3 py-2">
+        <div className="rounded-lg bg-slate-50 px-3 py-2">
           <p className="text-slate-500">Signatures InterPro</p>
           <p className="text-[17px] font-semibold text-slate-900">{s.signatures}</p>
           <p className="text-[12px] text-slate-500">{s.databases.join(", ") || (data.interpro.available ? "aucune" : "InterPro injoignable")} · positions dans Structures → Domaines</p>
@@ -139,7 +139,7 @@ export default function FunctionalAnnotation({ accession }: { accession: string 
 
 function Count({ label, total, experimental, detail }: { label: string; total: number; experimental: number; detail?: string }) {
   return (
-    <div className="rounded-md bg-slate-50 px-3 py-2">
+    <div className="rounded-lg bg-slate-50 px-3 py-2">
       <p className="text-slate-500">{label}</p>
       <p className="text-[17px] font-semibold text-slate-900">
         {total} <span className="text-[13px] font-normal text-emerald-700">dont {experimental} expérimental(aux)</span>

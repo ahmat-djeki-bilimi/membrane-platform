@@ -158,7 +158,7 @@ export default function Membrane3DViewer({
 
   if (!opmPdbId && !coordinates) {
     return (
-      <div className="flex h-[460px] items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-[14px] text-slate-500">
+      <div className="flex h-[460px] items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-[14px] text-slate-500">
         Cette structure n’est pas référencée dans OPM : son orientation dans la membrane
         n’est pas disponible.
       </div>
@@ -168,10 +168,10 @@ export default function Membrane3DViewer({
   const chains = subunits.map((s) => s.chain);
 
   return (
-    <div className="overflow-hidden rounded-md border border-slate-200 bg-white">
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2 text-[13px]">
         <span className="font-semibold text-slate-800">Coloration</span>
-        <div className="inline-flex rounded-md bg-white p-0.5 ring-1 ring-slate-200">
+        <div className="inline-flex rounded-lg bg-white p-0.5 ring-1 ring-slate-200">
           {(
             (coordinates
               ? [
@@ -209,7 +209,7 @@ export default function Membrane3DViewer({
         <div className="ml-auto flex gap-1.5">
           <button
             onClick={() => setSpin((v) => !v)}
-            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 font-semibold ${
+            className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 font-semibold ${
               spin ? "bg-slate-800 text-white" : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
             }`}
           >
@@ -221,14 +221,14 @@ export default function Membrane3DViewer({
               viewerRef.current?.zoomTo({ resn: "DUM", invert: true });
               viewerRef.current?.render();
             }}
-            className="rounded-md bg-white px-2 py-1 font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+            className="rounded-lg bg-white px-2 py-1 font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
           >
             Recentrer
           </button>
           {coordinates ? (
             <button
               onClick={() => downloadText(downloadName || "structure_predite.pdb", coordinates)}
-              className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+              className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
             >
               <Download size={12} />
               PDB orienté
@@ -236,7 +236,7 @@ export default function Membrane3DViewer({
           ) : (
             <a
               href={`${OPM_COORDINATES}/${opmPdbId!.toLowerCase()}.pdb`}
-              className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+              className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
             >
               <Download size={12} />
               PDB orienté

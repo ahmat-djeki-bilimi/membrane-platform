@@ -455,14 +455,14 @@ function SearchContent() {
     mode === "sequence" ? "Séquence soumise" : queryIsValid ? query : null;
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#eef2f6] text-slate-900">
+    <div className="flex min-h-screen flex-col app-bg text-slate-900">
       <SiteHeader active="search" />
 
       <section className={HERO_BG}>
         <div aria-hidden className={HERO_GLOW} />
         <div className="relative grid w-full gap-5 px-4 py-5 lg:grid-cols-[1fr_1.1fr] lg:items-end lg:px-6">
           <div>
-            <nav className="flex items-center gap-1 text-[13px] text-blue-200">
+            <nav className="flex items-center gap-1 text-[13px] text-indigo-200">
               <Link href="/" className="hover:text-white">
                 Accueil
               </Link>
@@ -478,7 +478,7 @@ function SearchContent() {
             <h1 className="mt-2 text-[28px] font-bold leading-tight tracking-tight text-white">
               Analyse de séquence
             </h1>
-            <p className="mt-1 text-[15px] text-blue-100">
+            <p className="mt-1 text-[15px] text-indigo-100">
               Annotation UniProtKB, topologie transmembranaire, hydropathie, propriétés
               physico-chimiques, composition et recherche de motifs — pour une accession ou
               n’importe quelle séquence protéique.
@@ -624,7 +624,7 @@ function SearchContent() {
                   <h3 className="mb-1 mt-3 text-[13px] font-semibold uppercase tracking-[0.12em] text-slate-500">
                     Fonction
                   </h3>
-                  <p className="max-h-[160px] overflow-auto rounded-md border border-slate-200 bg-slate-50 p-3 text-[14px] leading-5 text-slate-700">
+                  <p className="max-h-[160px] overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-3 text-[14px] leading-5 text-slate-700">
                     {uniprot.function || "Aucune fonction annotée."}
                   </p>
                 </Panel>
@@ -635,7 +635,7 @@ function SearchContent() {
                     <InfoBox label="Longueur" value={`${sequence.length.toLocaleString("fr-FR")} aa`} />
                     <InfoBox label="Masse" value={`${fmt(properties.molecularWeight / 1000)} kDa`} />
                   </dl>
-                  <p className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-[14px] leading-5 text-slate-600">
+                  <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-[14px] leading-5 text-slate-600">
                     Sans accession UniProt, l’annotation biologique et l’analyse structurale
                     (PDB, AlphaFold) ne sont pas disponibles. La topologie est prédite par
                     DeepTMHMM ; les autres analyses sont calculées à partir de la séquence.
@@ -732,7 +732,7 @@ function SearchContent() {
               </div>
 
               <div className="mt-3 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-                <div className="max-h-[240px] overflow-auto rounded-md border border-slate-200">
+                <div className="max-h-[240px] overflow-auto rounded-lg border border-slate-200">
                   <table className="w-full text-[14px]">
                     <thead className="sticky top-0 bg-slate-50 text-[13px] text-slate-600">
                       <tr>
@@ -776,7 +776,7 @@ function SearchContent() {
                   </table>
                 </div>
 
-                <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-[14px]">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-[14px]">
                   {tmhmm?.method === "DeepTMHMM" && (tmhmm.n_terminus || tmhmm.signal_peptide) && (
                     <div className="mb-3 border-b border-slate-200 pb-3">
                       <h3 className="text-[14px] font-semibold text-slate-900">Topologie DeepTMHMM</h3>
@@ -892,7 +892,7 @@ function SearchContent() {
               actions={
                 <button
                   onClick={copySequence}
-                  className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
                 >
                   {copied ? <CheckCircle2 size={13} /> : <Copy size={13} />}
                   {copied ? "Copiée" : "Copier la séquence"}
@@ -962,7 +962,7 @@ function SearchContent() {
                       placeholder="ex. N-{P}-[ST]-{P} ou RGD"
                       spellCheck={false}
                       autoComplete="off"
-                      className="w-full rounded-md border border-slate-300 bg-white py-1.5 pl-8 pr-2 font-mono text-[14px] outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
+                      className="w-full rounded-xl border border-slate-300 bg-white py-1.5 pl-8 pr-2 font-mono text-[14px] outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
                     />
                   </div>
                   <p className="text-[12px] leading-4 text-slate-500">
@@ -988,7 +988,7 @@ function SearchContent() {
                   </div>
 
                   {motif && (
-                    <div className="rounded-md border border-slate-200">
+                    <div className="rounded-lg border border-slate-200">
                       <p className="border-b border-slate-100 bg-slate-50 px-3 py-1.5 text-[13px] text-slate-700">
                         {motifResult.error ? (
                           <span className="text-rose-600">{motifResult.error}</span>
@@ -1031,7 +1031,7 @@ function SearchContent() {
                     <button
                       key={e.label}
                       onClick={e.run}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-[14px] font-medium text-slate-700 hover:bg-slate-50"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-[14px] font-medium text-slate-700 hover:bg-slate-50"
                     >
                       <Download size={13} />
                       {e.label}
@@ -1041,9 +1041,9 @@ function SearchContent() {
               </Panel>
 
               {mode === "accession" && uniprot ? (
-                <section className="flex flex-col items-start justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:flex-row sm:items-center">
+                <section className="flex flex-col items-start justify-between gap-3 card p-4 sm:flex-row sm:items-center">
                   <div className="flex items-start gap-3">
-                    <div className="rounded-md bg-violet-600 p-2 text-white">
+                    <div className="rounded-lg bg-violet-600 p-2 text-white">
                       <Info size={16} />
                     </div>
                     <div>
@@ -1058,8 +1058,8 @@ function SearchContent() {
                   <ContinueButton onClick={() => router.push(`/structures/${uniprot.accession}`)} />
                 </section>
               ) : (
-                <section className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white p-4">
-                  <div className="rounded-md bg-slate-500 p-2 text-white">
+                <section className="flex items-start gap-3 card p-4">
+                  <div className="rounded-lg bg-slate-500 p-2 text-white">
                     <Info size={16} />
                   </div>
                   <p className="text-[14px] text-slate-600">
@@ -1095,13 +1095,13 @@ function EntryHeader({
   onContinue: () => void;
 }) {
   return (
-    <section className="relative rounded-lg border border-slate-200 bg-white">
-      <span className="absolute inset-y-0 left-0 w-1 rounded-l-lg bg-gradient-to-b from-blue-600 to-cyan-500" />
+    <section className="relative card">
+      <span className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-indigo-500 via-violet-500 to-cyan-400" />
       <div className="flex flex-col gap-3 p-4 pl-5 lg:flex-row lg:items-center lg:justify-between">
         {mode === "accession" && uniprot ? (
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded bg-blue-600 px-2 py-0.5 font-mono text-[14px] font-semibold text-white">
+              <span className="rounded-md bg-gradient-to-r from-indigo-600 to-violet-600 px-2 py-0.5 font-mono text-[14px] font-semibold text-white">
                 {uniprot.accession}
               </span>
               {uniprot.entry_type && (
@@ -1161,7 +1161,7 @@ function EntryHeader({
               href={`https://www.uniprot.org/uniprotkb/${uniprot.accession}/entry`}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-2 text-[14px] font-medium text-slate-700 hover:bg-slate-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-[14px] font-medium text-slate-700 hover:bg-slate-50"
             >
               UniProt
               <ExternalLink size={13} />
@@ -1273,7 +1273,7 @@ function ContinueButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="inline-flex shrink-0 items-center gap-2 rounded-md bg-gradient-to-r from-blue-600 to-cyan-600 px-4 py-2 text-[15px] font-semibold text-white shadow-sm transition hover:from-blue-500 hover:to-cyan-500"
+      className="btn-primary shrink-0 px-4 py-2 text-[15px]"
     >
       Analyse structurale
       <ArrowRight size={15} />
@@ -1292,7 +1292,7 @@ function EmptyState() {
   ];
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white">
+    <section className="card">
       <div className="border-l-4 border-cyan-500 px-4 py-3">
         <h2 className="text-[18px] font-bold text-slate-900">
           Saisissez une accession UniProtKB ou collez une séquence
@@ -1306,7 +1306,7 @@ function EmptyState() {
         {features.map((f) => (
           <li key={f.title} className="relative flex gap-3 bg-white p-4">
             <span className={`absolute inset-x-0 top-0 h-1 ${TONES[f.tone].bar}`} />
-            <span className={`h-fit rounded-md p-2 ${TONES[f.tone].badge}`}>{f.icon}</span>
+            <span className={`h-fit rounded-lg p-2 ${TONES[f.tone].badge}`}>{f.icon}</span>
             <div>
               <h3 className="text-[16px] font-semibold text-slate-900">{f.title}</h3>
               <p className="mt-0.5 text-[14px] text-slate-600">{f.text}</p>
@@ -1321,15 +1321,15 @@ function EmptyState() {
 function LoadingSkeleton() {
   return (
     <div className="space-y-3" aria-busy="true" aria-label="Chargement">
-      <div className="h-[92px] animate-pulse rounded-lg border border-slate-200 bg-white" />
+      <div className="h-[92px] animate-pulse card" />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="h-[84px] animate-pulse rounded-lg border border-slate-200 bg-white" />
+          <div key={i} className="h-[84px] animate-pulse card" />
         ))}
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="h-[280px] animate-pulse rounded-lg border border-slate-200 bg-white" />
-        <div className="h-[280px] animate-pulse rounded-lg border border-slate-200 bg-white" />
+        <div className="h-[280px] animate-pulse card" />
+        <div className="h-[280px] animate-pulse card" />
       </div>
     </div>
   );

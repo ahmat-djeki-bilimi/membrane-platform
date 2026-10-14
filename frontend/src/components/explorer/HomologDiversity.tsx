@@ -46,7 +46,7 @@ export default function HomologDiversity({
   const noLineage = !["genus", "species"].includes(rank) && pool.every((h) => !Object.keys(h.lineage).length);
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4">
+    <section className="card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-[16px] font-semibold text-slate-900">Diversité taxonomique</h3>
         <label className="flex items-center gap-2 text-[13px] text-slate-600">
@@ -54,7 +54,7 @@ export default function HomologDiversity({
           <select
             value={rank}
             onChange={(e) => onRank(e.target.value)}
-            className="rounded-md border border-slate-300 px-2 py-1 text-[13px] outline-none focus:border-blue-500"
+            className="rounded-xl border border-slate-300 px-2 py-1 text-[13px] outline-none focus:border-blue-500"
           >
             {TAXON_RANKS.map((r) => (
               <option key={r.rank} value={r.rank}>
@@ -69,7 +69,7 @@ export default function HomologDiversity({
         <Stat label="Espèces" value={stats.species} />
         <Stat label="Genres" value={stats.genera} />
         <Stat label={`${label}s distincts`} value={stats.groups} />
-        <div className="rounded-md bg-slate-50 px-3 py-2">
+        <div className="rounded-lg bg-slate-50 px-3 py-2">
           <dt className="text-slate-500" title="Indice de Shannon des espèces de la sélection : plus il est élevé, plus les espèces sont nombreuses et également représentées">
             Indice de Shannon (espèces)
           </dt>
@@ -84,7 +84,7 @@ export default function HomologDiversity({
       )}
 
       {noLineage ? (
-        <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+        <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
           Lignées taxonomiques indisponibles pour cette analyse : choisissez le rang Genre ou Espèce, ou relancez l’analyse.
         </p>
       ) : (
@@ -146,7 +146,7 @@ export default function HomologDiversity({
 
 function Stat({ label, value: [selected, total] }: { label: string; value: number[] }) {
   return (
-    <div className="rounded-md bg-slate-50 px-3 py-2">
+    <div className="rounded-lg bg-slate-50 px-3 py-2">
       <dt className="text-slate-500">{label}</dt>
       <dd className="text-[16px] font-semibold tabular-nums text-slate-900">
         {selected} <span className="text-[13px] font-normal text-slate-500">/ {total} proposés</span>

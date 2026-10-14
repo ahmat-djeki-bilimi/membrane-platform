@@ -52,12 +52,12 @@ export default function AnalysesPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#eef2f6] text-slate-900">
+    <div className="flex min-h-screen flex-col app-bg text-slate-900">
       <SiteHeader active="analyses" />
       <section className={HERO_BG}>
         <div aria-hidden className={HERO_GLOW} />
         <div className="relative w-full px-4 py-6 lg:px-6">
-          <nav className="flex items-center gap-1 text-[13px] text-blue-200">
+          <nav className="flex items-center gap-1 text-[13px] text-indigo-200">
             <Link href="/" className="hover:text-white">
               Accueil
             </Link>
@@ -68,7 +68,7 @@ export default function AnalysesPage() {
             <History size={26} />
             Mes analyses
           </h1>
-          <p className="mt-1 max-w-3xl text-[15px] text-blue-100">
+          <p className="mt-1 max-w-3xl text-[15px] text-indigo-100">
             Chaque calcul est enregistré avec ses entrées, les versions des bases de données, les outils, les paramètres, les étapes, le
             résultat et les erreurs. Reprenez une analyse interrompue, comparez deux exécutions, exportez un rapport PDF ou les données.
           </p>
@@ -76,10 +76,10 @@ export default function AnalysesPage() {
       </section>
 
       <main className="w-full flex-1 space-y-4 px-4 py-5 lg:px-6">
-        <section className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-[13px]">
+        <section className="flex flex-wrap items-center gap-3 card px-4 py-3 text-[13px]">
           <label className="flex items-center gap-1.5">
             Statut
-            <select value={filter} onChange={(e) => setFilter(e.target.value as Filter)} className="rounded-md border border-slate-300 px-2 py-1">
+            <select value={filter} onChange={(e) => setFilter(e.target.value as Filter)} className="rounded-xl border border-slate-300 px-2 py-1">
               <option value="all">tous</option>
               <option value="succeeded">terminées</option>
               <option value="failed">en échec</option>
@@ -88,7 +88,7 @@ export default function AnalysesPage() {
           </label>
           <label className="flex items-center gap-1.5">
             Type
-            <select value={kind} onChange={(e) => setKind(e.target.value)} className="rounded-md border border-slate-300 px-2 py-1">
+            <select value={kind} onChange={(e) => setKind(e.target.value)} className="rounded-xl border border-slate-300 px-2 py-1">
               <option value="all">tous</option>
               {kinds.map(([value, label]) => (
                 <option key={value} value={value}>
@@ -100,7 +100,7 @@ export default function AnalysesPage() {
           <button
             onClick={() => router.push(`/analyses/comparer?a=${selected[0]}&b=${selected[1]}`)}
             disabled={selected.length !== 2}
-            className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-[#0f4c81] px-3 py-1.5 font-semibold text-white hover:bg-[#0c3d68] disabled:cursor-not-allowed disabled:opacity-40"
+            className="btn-primary ml-auto gap-1.5 px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <GitCompare size={14} />
             Comparer les 2 exécutions cochées
@@ -124,7 +124,7 @@ export default function AnalysesPage() {
         )}
 
         {shown.length > 0 && (
-          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+          <div className="overflow-x-auto card">
             <table className="w-full text-[13px]">
               <thead className="bg-slate-50 text-left text-slate-500">
                 <tr>

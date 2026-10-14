@@ -95,10 +95,10 @@ ${stored.sequence}
 
   if (autoLaunch) {
     return (
-      <div className="flex min-h-screen flex-col bg-[#eef2f6] text-slate-900">
+      <div className="flex min-h-screen flex-col app-bg text-slate-900">
         <SiteHeader active="explorer" />
         <main className="flex w-full flex-1 flex-col gap-4 px-4 py-6 lg:px-6">
-          <section className="rounded-lg border border-slate-200 bg-white p-5">
+          <section className="card p-5">
             {error ? (
               <>
                 <p className="text-[15px] text-rose-700">Analyse impossible : {error}</p>
@@ -125,13 +125,13 @@ ${stored.sequence}
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#eef2f6] text-slate-900">
+    <div className="flex min-h-screen flex-col app-bg text-slate-900">
       <SiteHeader active="explorer" />
 
       <section className={HERO_BG}>
         <div aria-hidden className={HERO_GLOW} />
         <div className="relative w-full px-4 py-5 lg:px-6">
-          <nav className="flex flex-wrap items-center gap-1 text-[13px] text-blue-200">
+          <nav className="flex flex-wrap items-center gap-1 text-[13px] text-indigo-200">
             <Link href="/" className="hover:text-white">
               Accueil
             </Link>
@@ -145,7 +145,7 @@ ${stored.sequence}
           <h1 className="mt-1.5 text-[26px] font-bold leading-tight tracking-tight text-white sm:text-[30px]">
             Évolution et fonction des protéines membranaires
           </h1>
-          <p className="text-[15px] text-blue-100">
+          <p className="text-[15px] text-indigo-100">
             De la famille de séquences homologues à la carte des résidus importants dans la membrane
           </p>
         </div>
@@ -154,7 +154,7 @@ ${stored.sequence}
       <main className="flex w-full flex-1 flex-col gap-4 px-4 py-4 lg:px-6">
         <ImportPanel onSubmit={(request) => submit(request)} submitting={submitting} error={error} />
 
-        <section className="rounded-lg border border-slate-200 bg-white">
+        <section className="card">
           <div className="border-b border-slate-100 px-4 py-3">
             <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-500">Ce que fait le module</p>
             <h2 className="text-[17px] font-semibold text-slate-900">Trois questions sur une famille de protéines membranaires</h2>
@@ -163,7 +163,7 @@ ${stored.sequence}
             {FEATURES.map((f, i) => (
               <div key={f.title} className="bg-white p-4">
                 <div className="flex items-center gap-2">
-                  <span className={`rounded-md p-2 shadow-sm ${TONES[f.tone].badge}`}>{f.icon}</span>
+                  <span className={`rounded-lg p-2 shadow-sm ${TONES[f.tone].badge}`}>{f.icon}</span>
                   <h3 className="text-[15px] font-semibold leading-5 text-slate-900">
                     {i + 1}. {f.title}
                   </h3>

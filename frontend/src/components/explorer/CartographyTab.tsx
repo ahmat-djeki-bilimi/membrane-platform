@@ -100,7 +100,7 @@ export default function CartographyTab({
     <div className="space-y-4">
       <div className={`grid gap-4 ${structure ? "xl:grid-cols-[1.25fr_1fr]" : ""}`}>
         {structure && (
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <section className="card p-4">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-[16px] font-semibold text-slate-900">Carte 3D des résidus</h3>
               <SegmentedControl
@@ -121,7 +121,7 @@ export default function CartographyTab({
           </section>
         )}
 
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
+        <section className="card p-4">
           <h3 className="text-[16px] font-semibold text-slate-900">Conservation selon la position dans la membrane</h3>
           <p className="mb-2 text-[13px] text-slate-500">
             {structure?.membrane
@@ -156,7 +156,7 @@ export default function CartographyTab({
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               onClick={() => downloadText(`${fileBase}_cartographie.csv`, residuesCsv(result), "text/csv")}
-              className="inline-flex items-center gap-1.5 rounded-md bg-white px-3 py-1.5 text-[13px] font-semibold text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-[13px] font-semibold text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50"
             >
               <Download size={13} />
               Tableau des résidus (CSV)
@@ -165,7 +165,7 @@ export default function CartographyTab({
               <button
                 onClick={() => downloadText(`${fileBase}_conservation.pdb`, pdbWithGrades(structure.pdb, positions))}
                 title="Grade de conservation dans la colonne B-factor, pour PyMOL ou ChimeraX"
-                className="inline-flex items-center gap-1.5 rounded-md bg-white px-3 py-1.5 text-[13px] font-semibold text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-[13px] font-semibold text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50"
               >
                 <Download size={13} />
                 PDB coloré par conservation
@@ -175,7 +175,7 @@ export default function CartographyTab({
         </section>
       </div>
 
-      <section className="rounded-lg border border-slate-200 bg-white">
+      <section className="card">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
           <div>
             <h3 className="text-[16px] font-semibold text-slate-900">Positions candidates ({candidates.length})</h3>

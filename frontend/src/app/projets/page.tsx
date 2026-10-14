@@ -13,7 +13,7 @@ import { HERO_BG, HERO_GLOW } from "@/lib/theme";
 
 export default function ProjetsPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-[#eef2f6] text-slate-900">
+    <div className="flex min-h-screen flex-col app-bg text-slate-900">
       <SiteHeader active="projects" />
       <RequireAuth>
         <ProjectsContent />
@@ -58,7 +58,7 @@ function ProjectsContent() {
         <div aria-hidden className={HERO_GLOW} />
         <div className="relative px-4 py-6 lg:px-6">
           <h1 className="text-[28px] font-bold text-white">Mes projets</h1>
-          <p className="mt-1 text-[15px] text-blue-100">
+          <p className="mt-1 text-[15px] text-indigo-100">
             {user?.name ? `${user.name} · ` : ""}
             {user?.email}
           </p>
@@ -73,7 +73,7 @@ function ProjectsContent() {
             </Alert>
           )}
           {projects === null ? (
-            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-6 text-[15px] text-slate-500">
+            <div className="flex items-center gap-2 card p-6 text-[15px] text-slate-500">
               <Loader2 size={16} className="animate-spin" />
               Chargement des projets…
             </div>
@@ -92,9 +92,9 @@ function ProjectsContent() {
                 <li key={p.id}>
                   <Link
                     href={`/projets/${p.id}`}
-                    className="relative block overflow-hidden rounded-lg border border-slate-200 bg-white p-4 transition hover:border-blue-300 hover:shadow-sm"
+                    className="relative block overflow-hidden card card-hover p-4"
                   >
-                    <span className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-600 to-cyan-500" />
+                    <span className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-500 via-violet-500 to-cyan-400" />
                     <p className="text-[17px] font-semibold text-slate-900">{p.name}</p>
                     {p.description && (
                       <p className="mt-1 line-clamp-2 text-[14px] text-slate-600">{p.description}</p>
@@ -110,9 +110,9 @@ function ProjectsContent() {
           )}
         </section>
 
-        <form onSubmit={create} className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
+        <form onSubmit={create} className="space-y-3 card p-4">
           <h2 className="flex items-center gap-2 text-[16px] font-semibold text-slate-900">
-            <FolderPlus size={18} className="text-[#0f4c81]" />
+            <FolderPlus size={18} className="text-indigo-700" />
             Nouveau projet
           </h2>
           <input
@@ -121,7 +121,7 @@ function ProjectsContent() {
             placeholder="Nom du projet, ex. Canaux potassiques"
             maxLength={120}
             required
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-[15px] outline-none focus:border-[#0f4c81] focus:ring-2 focus:ring-blue-100"
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-[15px] outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
           />
           <textarea
             value={description}
@@ -129,12 +129,12 @@ function ProjectsContent() {
             placeholder="Description (facultatif)"
             rows={3}
             maxLength={5000}
-            className="w-full resize-y rounded-md border border-slate-300 px-3 py-2 text-[15px] outline-none focus:border-[#0f4c81] focus:ring-2 focus:ring-blue-100"
+            className="w-full resize-y rounded-xl border border-slate-300 px-3 py-2 text-[15px] outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
           />
           <button
             type="submit"
             disabled={creating || !name.trim()}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#0f4c81] px-4 py-2 text-[15px] font-semibold text-white hover:bg-[#0c3d68] disabled:opacity-50"
+            className="btn-primary w-full gap-2 px-4 py-2 text-[15px] disabled:opacity-50"
           >
             {creating ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
             Créer le projet

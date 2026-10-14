@@ -19,32 +19,32 @@ export function Panel({
   id?: string;
 }) {
   return (
-    <section
-      id={id}
-      className="relative scroll-mt-16 overflow-hidden rounded-lg border border-slate-200 bg-white"
-    >
+    <section id={id} className="card relative scroll-mt-20 overflow-hidden">
       <span className={`absolute inset-x-0 top-0 h-1 ${TONES[tone].bar}`} />
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 pb-2.5 pt-3.5">
-        <div className="flex items-center gap-2.5">
-          <span className={`rounded-md p-2 shadow-sm ${TONES[tone].badge}`}>{icon}</span>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-b from-slate-50/70 to-white px-5 pb-3 pt-4">
+        <div className="flex items-center gap-3">
+          <span className={`rounded-xl p-2.5 ${TONES[tone].badge}`}>{icon}</span>
           <div>
-            <p className={`text-[12px] font-semibold uppercase tracking-[0.14em] ${TONES[tone].text}`}>
+            <p className={`text-[11.5px] font-bold uppercase tracking-[0.16em] ${TONES[tone].text}`}>
               {label}
             </p>
-            <h2 className="text-[17px] font-semibold text-slate-900">{title}</h2>
+            <h2 className="text-[17px] font-bold tracking-tight text-slate-900">{title}</h2>
           </div>
         </div>
         {actions}
       </div>
-      <div className="p-4">{children}</div>
+      <div className="p-5">{children}</div>
     </section>
   );
 }
 
 export function PanelLoading({ text }: { text: string }) {
   return (
-    <div className="flex items-center gap-2 py-6 text-[14px] text-slate-500">
-      <Loader2 size={15} className="animate-spin text-cyan-600" />
+    <div className="flex items-center gap-2.5 py-6 text-[14px] text-slate-500">
+      <span className="relative flex h-5 w-5 items-center justify-center">
+        <span className="absolute inset-0 animate-ping rounded-full bg-indigo-400/30" />
+        <Loader2 size={15} className="animate-spin text-indigo-600" />
+      </span>
       {text}
     </div>
   );
@@ -64,18 +64,20 @@ export function StatCard({
   hint: string;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-white p-3">
+    <div className="card card-hover group relative overflow-hidden p-4">
       <span className={`absolute inset-x-0 top-0 h-1 ${TONES[tone].bar}`} />
-      <div className="flex items-center gap-2">
-        <span className={`rounded-md p-1.5 ${TONES[tone].badge}`}>{icon}</span>
-        <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-          {label}
-        </p>
+      <span
+        aria-hidden
+        className={`pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full opacity-[0.12] blur-xl transition group-hover:opacity-25 ${TONES[tone].bar}`}
+      />
+      <div className="flex items-center gap-2.5">
+        <span className={`rounded-lg p-1.5 ${TONES[tone].badge}`}>{icon}</span>
+        <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-slate-500">{label}</p>
       </div>
       {value === null ? (
-        <div className="mt-2 h-6 w-24 animate-pulse rounded bg-slate-100" />
+        <div className="mt-2.5 h-7 w-24 animate-pulse rounded-lg bg-slate-100" />
       ) : (
-        <p className="mt-1.5 text-[22px] font-bold text-slate-900">{value}</p>
+        <p className="mt-2 text-[24px] font-extrabold tracking-tight text-slate-900">{value}</p>
       )}
       <p className="truncate text-[13px] text-slate-500" title={hint}>
         {hint}
@@ -98,9 +100,9 @@ export function Alert({
   return (
     <div
       role={tone === "rose" ? "alert" : "status"}
-      className={`flex items-start gap-3 rounded-lg border border-slate-200 p-3 ${TONES[tone].soft}`}
+      className={`flex items-start gap-3 rounded-2xl border p-3.5 ${TONES[tone].soft}`}
     >
-      <span className={`mt-0.5 shrink-0 rounded-md p-1.5 ${TONES[tone].badge}`}>
+      <span className={`mt-0.5 shrink-0 rounded-lg p-1.5 ${TONES[tone].badge}`}>
         {loading ? (
           <Loader2 size={14} className="animate-spin" />
         ) : tone === "rose" || tone === "amber" ? (
@@ -112,7 +114,7 @@ export function Alert({
         )}
       </span>
       <div>
-        <p className="text-[15px] font-semibold">{title}</p>
+        <p className="text-[15px] font-bold">{title}</p>
         <div className="text-[14px] leading-5 text-slate-700">{children}</div>
       </div>
     </div>
@@ -134,15 +136,13 @@ export function InfoBox({
 }) {
   return (
     <div
-      className={`rounded-md border border-slate-200 bg-slate-50 px-3 py-2 ${
+      className={`rounded-xl border border-slate-200/70 bg-gradient-to-br from-slate-50 to-indigo-50/40 px-3 py-2 ${
         wide ? "sm:col-span-2" : ""
       }`}
     >
-      <dt className="text-[12px] font-medium uppercase tracking-[0.08em] text-slate-500">
-        {label}
-      </dt>
+      <dt className="text-[11.5px] font-bold uppercase tracking-[0.1em] text-slate-500">{label}</dt>
       <dd
-        className={`truncate text-[15px] font-medium text-slate-900 ${mono ? "font-mono" : ""} ${
+        className={`truncate text-[15px] font-semibold text-slate-900 ${mono ? "font-mono" : ""} ${
           italic ? "italic" : ""
         }`}
         title={value}
@@ -165,7 +165,11 @@ export function SegmentedControl<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex rounded-md bg-slate-100 p-0.5">
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className="inline-flex rounded-xl border border-slate-200/80 bg-slate-100/80 p-1"
+    >
       {options.map((o) => (
         <button
           key={o.value}
@@ -175,9 +179,9 @@ export function SegmentedControl<T extends string>({
           disabled={o.disabled}
           title={o.title}
           onClick={() => onChange(o.value)}
-          className={`rounded px-2.5 py-1 text-[13px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+          className={`rounded-lg px-3 py-1 text-[13px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
             value === o.value
-              ? "bg-white text-slate-900 shadow-sm"
+              ? "bg-white text-indigo-700 shadow-sm ring-1 ring-indigo-100"
               : "text-slate-600 hover:text-slate-900"
           }`}
         >

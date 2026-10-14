@@ -35,7 +35,7 @@ export type ColumnProps = { result: ComparisonResult; column: number | null; onC
 
 export function Section({ title, subtitle, children, right }: { title: string; subtitle?: React.ReactNode; children: React.ReactNode; right?: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4">
+    <section className="card p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h3 className="text-[16px] font-semibold text-slate-900">{title}</h3>
@@ -224,7 +224,7 @@ export function OverviewTab({ result, onTab }: { result: ComparisonResult; onTab
         {result.proteins.map((protein, p) => {
           const model = result.structures.models[p];
           return (
-            <div key={protein.accession} className="rounded-lg border border-slate-200 bg-white p-3" style={{ borderTop: `4px solid ${proteinColor(p)}` }}>
+            <div key={protein.accession} className="card p-3" style={{ borderTop: `4px solid ${proteinColor(p)}` }}>
               <p className="flex items-center justify-between gap-2">
                 <ProteinLabel result={result} p={p} />
                 <Link href={`/structures/${protein.accession}`} className="text-[12px] font-semibold text-blue-700 hover:underline">
@@ -385,7 +385,7 @@ export function SequencesTab({ result, column, onColumn }: ColumnProps) {
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md bg-slate-50 px-3 py-2">
+    <div className="rounded-lg bg-slate-50 px-3 py-2">
       <dt className="text-slate-500">{label}</dt>
       <dd className="font-semibold text-slate-900">{value}</dd>
     </div>

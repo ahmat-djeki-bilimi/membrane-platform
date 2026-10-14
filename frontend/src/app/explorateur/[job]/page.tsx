@@ -95,13 +95,13 @@ function ExplorerResult() {
   const selectedPosition = ready && selected ? result.positions[selected - 1] : null;
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#eef2f6] text-slate-900">
+    <div className="flex min-h-screen flex-col app-bg text-slate-900">
       <SiteHeader active="explorer" />
 
       <section className={HERO_BG}>
         <div aria-hidden className={HERO_GLOW} />
         <div className="relative w-full px-4 py-5 lg:px-6">
-          <nav className="flex flex-wrap items-center gap-1 text-[13px] text-blue-200">
+          <nav className="flex flex-wrap items-center gap-1 text-[13px] text-indigo-200">
             <Link href="/" className="hover:text-white">
               Accueil
             </Link>
@@ -126,7 +126,7 @@ function ExplorerResult() {
                 {ready ? result.reference.protein_name || result.reference.id : "Analyse de la famille"}
               </h1>
               {ready && (
-                <p className="text-[15px] text-blue-100">
+                <p className="text-[15px] text-indigo-100">
                   {result.reference.organism && <span className="italic">{result.reference.organism}</span>}
                   {result.reference.organism ? " · " : ""}
                   {result.reference.length} résidus · famille de {result.input.kept + 1} séquences
@@ -137,7 +137,7 @@ function ExplorerResult() {
               {ready && (
                 <button
                   onClick={() => downloadText(`${fileBase}_alignement.fasta`, alignmentFasta(result))}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-white/25 bg-white/10 px-3 py-2 text-[14px] font-medium text-white hover:bg-white/20"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/25 bg-white/10 px-3 py-2 text-[14px] font-medium text-white hover:bg-white/20"
                 >
                   <Download size={14} />
                   Alignement (FASTA)
@@ -146,14 +146,14 @@ function ExplorerResult() {
               {ready && result.reference.accession && (
                 <Link
                   href={`/structures/${result.reference.accession}`}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-white/25 bg-white/10 px-3 py-2 text-[14px] font-medium text-white hover:bg-white/20"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/25 bg-white/10 px-3 py-2 text-[14px] font-medium text-white hover:bg-white/20"
                 >
                   Fiche {result.reference.accession}
                 </Link>
               )}
               <Link
                 href="/explorateur"
-                className="inline-flex items-center gap-1.5 rounded-md bg-white px-3 py-2 text-[14px] font-semibold text-[#0f4c81] hover:bg-blue-50"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-[14px] font-semibold text-indigo-700 hover:bg-blue-50"
               >
                 <Plus size={14} />
                 Nouvelle analyse
@@ -164,7 +164,7 @@ function ExplorerResult() {
       </section>
 
       {ready && (
-        <div className="sticky top-[var(--site-header-h,62px)] z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
+        <div className="sticky top-[var(--site-header-h,65px)] z-30 border-b border-slate-200/70 bg-white/80 shadow-[0_6px_20px_-14px_rgba(30,27,75,0.35)] backdrop-blur-xl backdrop-saturate-150">
           <div className="flex w-full flex-col gap-2 px-4 py-2 lg:px-6">
             <div role="tablist" className="-mx-1 flex gap-1 overflow-x-auto px-1">
               {TABS.map((t) => (
@@ -173,8 +173,8 @@ function ExplorerResult() {
                   role="tab"
                   aria-selected={tab === t.key}
                   onClick={() => openTab(t.key)}
-                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-[14px] font-semibold transition ${
-                    tab === t.key ? "bg-[#0f4c81] text-white shadow-sm" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[14px] font-semibold transition ${
+                    tab === t.key ? "tab-active" : "text-slate-600 hover:bg-indigo-50 hover:text-indigo-700"
                   }`}
                 >
                   {t.icon}
@@ -183,7 +183,7 @@ function ExplorerResult() {
               ))}
             </div>
             {selectedPosition && (
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md bg-violet-50 px-3 py-1.5 text-[13px] text-violet-900">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg bg-violet-50 px-3 py-1.5 text-[13px] text-violet-900">
                 <span className="font-mono text-[14px] font-bold">
                   {selectedPosition.residue}
                   {selectedPosition.position}
@@ -263,7 +263,7 @@ function Progress({ status, error, expand }: { status: string; error: string | n
     );
   }
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5">
+    <section className="card p-5">
       <div className="flex items-start gap-3 text-slate-600">
         <Loader2 size={20} className="mt-0.5 shrink-0 animate-spin text-cyan-600" />
         <div>
@@ -325,18 +325,18 @@ function Overview({ result, onOpen }: { result: ExplorerResult; onOpen: (tab: Ta
         </p>
       ))}
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <section className="card p-4">
         <h2 className="text-[16px] font-semibold text-slate-900">Synthèse</h2>
         <ul className="mt-2 grid gap-2 lg:grid-cols-2">
           {result.interpretation.map((note) => (
-            <li key={note.topic} className="rounded-md bg-slate-50 px-3 py-2 text-[14px] leading-5 text-slate-700">
+            <li key={note.topic} className="rounded-lg bg-slate-50 px-3 py-2 text-[14px] leading-5 text-slate-700">
               <b className="text-slate-900">{note.title}.</b> {note.text}
             </li>
           ))}
         </ul>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <section className="card p-4">
         <h2 className="text-[16px] font-semibold text-slate-900">Positions candidates en tête</h2>
         <p className="mb-2 text-[13px] text-slate-500">Le détail et la carte 3D sont dans l’onglet Cartographie.</p>
         <div className="flex flex-wrap gap-1.5">
@@ -354,12 +354,12 @@ function Overview({ result, onOpen }: { result: ExplorerResult; onOpen: (tab: Ta
           <button
             key={t.key}
             onClick={() => onOpen(t.key)}
-            className="group rounded-lg border border-slate-200 bg-white p-3 text-left hover:border-[#0f4c81]"
+            className="group card card-hover p-3 text-left"
           >
             <span className="flex items-center gap-1.5 text-[15px] font-semibold text-slate-900">
               {t.icon}
               {t.label}
-              <ArrowRight size={14} className="ml-auto text-slate-400 group-hover:text-[#0f4c81]" />
+              <ArrowRight size={14} className="ml-auto text-slate-400 group-hover:text-indigo-700" />
             </span>
             <span className="mt-1 block text-[13px] leading-5 text-slate-500">{t.text}</span>
           </button>

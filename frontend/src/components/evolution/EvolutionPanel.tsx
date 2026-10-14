@@ -57,10 +57,10 @@ export default function EvolutionPanel({
     <div className="space-y-4">
       <ExplorerCallout href={explorerHref} onOpen={rememberSequence} />
 
-      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <section className="overflow-hidden card">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
           <div className="flex items-center gap-2.5">
-            <span className="rounded-md bg-violet-600 p-2 text-white shadow-sm">
+            <span className="rounded-lg bg-violet-600 p-2 text-white shadow-sm">
               <GitBranch size={16} />
             </span>
             <div>
@@ -73,7 +73,7 @@ export default function EvolutionPanel({
             {status === "succeeded" && result && (
               <button
                 onClick={() => exportCsv(fileBase, result)}
-                className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
               >
                 <Download size={13} />
                 Conservation (CSV)
@@ -121,7 +121,7 @@ function Summary({ result, matched, reviewed }: { result: ConservationResult; ma
   return (
     <>
       {matched && (
-        <div className="mx-4 mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[14px] text-emerald-900">
+        <div className="mx-4 mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[14px] text-emerald-900">
           <span>
             Séquence identique à l’entrée UniProt <span className="font-mono font-semibold">{matched}</span>
             {reviewed ? " (Swiss-Prot)" : ""} : l’analyse porte sur cette entrée.
@@ -149,7 +149,7 @@ function Summary({ result, matched, reviewed }: { result: ConservationResult; ma
       </div>
 
       {result.warnings.map((w) => (
-        <p key={w} className="mx-4 mb-3 flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-[14px] text-amber-900">
+        <p key={w} className="mx-4 mb-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-[14px] text-amber-900">
           <AlertTriangle size={16} className="mt-0.5 shrink-0" />
           {w}
         </p>
@@ -186,7 +186,7 @@ function ExplorerCallout({ href, onOpen }: { href: string; onOpen: () => void })
       onClick={onOpen}
       className="group flex flex-wrap items-center gap-4 rounded-lg border border-emerald-200 bg-gradient-to-r from-emerald-50 via-white to-violet-50 p-4 hover:border-emerald-400"
     >
-      <span className="rounded-md bg-emerald-600 p-2.5 text-white shadow-sm">
+      <span className="rounded-lg bg-emerald-600 p-2.5 text-white shadow-sm">
         <Sparkles size={18} />
       </span>
       <span className="min-w-0 flex-1">
@@ -196,7 +196,7 @@ function ExplorerCallout({ href, onOpen }: { href: string; onOpen: () => void })
           coévolution. Cette page n’en montre qu’un aperçu.
         </span>
       </span>
-      <span className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-2 text-[14px] font-semibold text-white group-hover:bg-emerald-700">
+      <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-[14px] font-semibold text-white group-hover:bg-emerald-700">
         Ouvrir dans l’Explorateur
         <ArrowRight size={15} />
       </span>
@@ -206,7 +206,7 @@ function ExplorerCallout({ href, onOpen }: { href: string; onOpen: () => void })
 
 function Stat({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
       <p className="text-[12px] font-medium uppercase tracking-[0.08em] text-slate-500">{label}</p>
       <p className="text-[22px] font-bold text-slate-900">{value}</p>
       <p className="text-[13px] text-slate-500">{hint}</p>
@@ -249,7 +249,7 @@ function exportCsv(base: string, result: ConservationResult) {
 
 function SourceSwitch({ source, onChange }: { source: ConservationSource; onChange: (s: ConservationSource) => void }) {
   return (
-    <div className="inline-flex rounded-md bg-slate-100 p-0.5 text-[13px]" role="radiogroup" aria-label="Source des homologues">
+    <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-[13px]" role="radiogroup" aria-label="Source des homologues">
       {(
         [
           ["uniref50", "Orthologues proches", "UniRef50 : séquences à au moins 50 % d’identité, rapide"],

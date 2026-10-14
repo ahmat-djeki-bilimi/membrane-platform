@@ -76,7 +76,7 @@ export default function PredictedStructurePanel({
           </p>
           <button
             onClick={() => setLaunched(true)}
-            className="inline-flex items-center gap-1.5 rounded-md bg-cyan-700 px-3 py-1.5 text-[14px] font-semibold text-white hover:bg-cyan-800"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-700 px-3 py-1.5 text-[14px] font-semibold text-white hover:bg-cyan-800"
           >
             <Play size={14} />
             Prédire la structure
@@ -98,7 +98,7 @@ export default function PredictedStructurePanel({
         actions: canCompare ? (
           <a
             href="#superposition"
-            className="inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[14px] font-semibold text-white hover:bg-violet-700"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-[14px] font-semibold text-white hover:bg-violet-700"
           >
             <ArrowDown size={14} />
             Superposition avec le cristal
@@ -251,7 +251,7 @@ function Result({
 
       {membrane && (
         <div className="grid gap-4 xl:grid-cols-[1.35fr_1fr]">
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <section className="card p-4">
             <h3 className="text-[16px] font-semibold text-slate-900">Topologie colorée par confiance</h3>
             <p className="mb-2 text-[13px] text-slate-500">
               Côtés des boucles d’après le placement 3D ; chaque résidu prend la couleur de son pLDDT.
@@ -275,7 +275,7 @@ function Result({
       )}
 
       {membrane && (
-        <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-2">
+        <section className="grid gap-4 card p-4 md:grid-cols-2">
           <ResidueList
             title="Ceinture aromatique"
             hint="Trp et Tyr à moins de 5 Å d’une face de la bicouche : ancrage aux interfaces."
@@ -308,7 +308,7 @@ function Result({
 
 function Stat({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
       <p className="text-[12px] font-medium uppercase tracking-[0.08em] text-slate-500">{label}</p>
       <p className="text-[22px] font-bold text-slate-900">{value}</p>
       <p className="truncate text-[13px] text-slate-500" title={hint}>
@@ -333,7 +333,7 @@ function WindowNotice({
   const [value, setValue] = useState(window.start);
   const outside = segments.filter((s) => s.end < window.start || s.start > window.end).length;
   return (
-    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[14px] text-amber-900">
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[14px] text-amber-900">
       <p className="flex items-start gap-2">
         <AlertTriangle size={16} className="mt-0.5 shrink-0" />
         <span>
@@ -360,7 +360,7 @@ function WindowNotice({
             className="w-20 rounded border border-amber-300 bg-white px-1.5 py-0.5 font-mono text-slate-900"
           />
         </label>
-        <button className="rounded-md bg-amber-600 px-2.5 py-1 text-[13px] font-semibold text-white hover:bg-amber-700">
+        <button className="rounded-lg bg-amber-600 px-2.5 py-1 text-[13px] font-semibold text-white hover:bg-amber-700">
           Modéliser cette région
         </button>
       </form>
@@ -376,7 +376,7 @@ const NOTE_STYLE = {
 
 function Interpretation({ notes }: { notes: InterpretationNote[] }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4">
+    <section className="card p-4">
       <h3 className="text-[16px] font-semibold text-slate-900">Lecture biologique</h3>
       <p className="mb-3 text-[13px] text-slate-500">
         Déduite de la structure par des règles explicites : à confronter aux données expérimentales.
@@ -385,7 +385,7 @@ function Interpretation({ notes }: { notes: InterpretationNote[] }) {
         {notes.map((note, i) => {
           const style = NOTE_STYLE[note.level] ?? NOTE_STYLE.info;
           return (
-            <li key={`${i}-${note.title}`} className={`flex gap-2.5 rounded-md border px-3 py-2 ${style.className}`}>
+            <li key={`${i}-${note.title}`} className={`flex gap-2.5 rounded-lg border px-3 py-2 ${style.className}`}>
               <span className={`mt-0.5 shrink-0 ${style.iconClass}`}>{style.icon}</span>
               <div>
                 <p className="text-[14px] font-semibold text-slate-900">{note.title}</p>
@@ -409,12 +409,12 @@ function HelixTable({
   onSelect: (range: Range) => void;
 }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4">
+    <section className="card p-4">
       <h3 className="text-[16px] font-semibold text-slate-900">Hélices dans la bicouche</h3>
       <p className="mb-2 text-[13px] text-slate-500">
         Inclinaison par rapport à la normale ; cliquez une hélice pour la voir en 3D.
       </p>
-      <div className="overflow-auto rounded-md border border-slate-200">
+      <div className="overflow-auto rounded-lg border border-slate-200">
         <table className="w-full text-[14px]">
           <thead className="bg-slate-50 text-[13px] text-slate-600">
             <tr>

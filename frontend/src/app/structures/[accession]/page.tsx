@@ -429,13 +429,13 @@ export default function StructurePage() {
   );
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#eef2f6] text-slate-900">
+    <div className="flex min-h-screen flex-col app-bg text-slate-900">
       <SiteHeader />
 
       <section className={HERO_BG}>
         <div aria-hidden className={HERO_GLOW} />
         <div className="relative w-full px-4 py-5 lg:px-6">
-          <nav className="flex flex-wrap items-center gap-1 text-[13px] text-blue-200">
+          <nav className="flex flex-wrap items-center gap-1 text-[13px] text-indigo-200">
             <Link href="/" className="hover:text-white">
               Accueil
             </Link>
@@ -464,7 +464,7 @@ export default function StructurePage() {
               <h1 className="mt-1.5 text-[26px] font-bold leading-tight tracking-tight text-white sm:text-[30px]">
                 {proteinName}
               </h1>
-              {organism && <p className="text-[15px] italic text-blue-100">{organism}</p>}
+              {organism && <p className="text-[15px] italic text-indigo-100">{organism}</p>}
             </div>
             <div className="flex flex-wrap gap-2">
               <SaveToProject
@@ -481,7 +481,7 @@ export default function StructurePage() {
               />
               <Link
                 href={`/search?q=${accession}`}
-                className="inline-flex items-center gap-1.5 rounded-md border border-white/25 bg-white/10 px-3 py-2 text-[14px] font-medium text-white hover:bg-white/20"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/25 bg-white/10 px-3 py-2 text-[14px] font-medium text-white hover:bg-white/20"
               >
                 <ArrowLeft size={14} />
                 Analyse de séquence
@@ -490,7 +490,7 @@ export default function StructurePage() {
                 href={`https://www.uniprot.org/uniprotkb/${accession}/entry`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-md border border-white/25 bg-white/10 px-3 py-2 text-[14px] font-medium text-white hover:bg-white/20"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/25 bg-white/10 px-3 py-2 text-[14px] font-medium text-white hover:bg-white/20"
               >
                 UniProt
                 <ExternalLink size={13} />
@@ -500,7 +500,7 @@ export default function StructurePage() {
         </div>
       </section>
 
-      <div className="sticky top-[var(--site-header-h,62px)] z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
+      <div className="sticky top-[var(--site-header-h,65px)] z-30 border-b border-slate-200/70 bg-white/80 shadow-[0_6px_20px_-14px_rgba(30,27,75,0.35)] backdrop-blur-xl backdrop-saturate-150">
         <div className="flex w-full flex-col gap-2 px-4 py-2 lg:flex-row lg:items-center lg:justify-between lg:px-6">
           {/* min-w-0 : la liste défile au lieu de passer sous le choix de la structure */}
           <div role="tablist" className="-mx-1 flex min-w-0 gap-1 overflow-x-auto px-1 lg:flex-1">
@@ -510,10 +510,10 @@ export default function StructurePage() {
                 role="tab"
                 aria-selected={tab === t.key}
                 onClick={() => setTab(t.key)}
-                className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-[14px] font-semibold transition ${
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[14px] font-semibold transition ${
                   tab === t.key
-                    ? "bg-[#0f4c81] text-white shadow-sm"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    ? "tab-active"
+                    : "text-slate-600 hover:bg-indigo-50 hover:text-indigo-700"
                 }`}
               >
                 {t.icon}
@@ -523,7 +523,7 @@ export default function StructurePage() {
           </div>
 
           <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <div className="inline-flex rounded-md bg-slate-100 p-0.5" role="radiogroup" aria-label="Source du modèle">
+            <div className="inline-flex rounded-lg bg-slate-100 p-0.5" role="radiogroup" aria-label="Source du modèle">
               {(
                 [
                   ["pdb", "PDB", structures.length > 0],
@@ -537,7 +537,7 @@ export default function StructurePage() {
                   disabled={!enabled}
                   onClick={() => setSource(key)}
                   className={`rounded px-2.5 py-1 text-[13px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                    source === key ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
+                    source === key ? "bg-white text-indigo-700 shadow-sm ring-1 ring-indigo-100" : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
                   {label}
@@ -552,7 +552,7 @@ export default function StructurePage() {
                   const s = structures.find((x) => x.pdb_id === e.target.value);
                   if (s) selectStructure(s);
                 }}
-                className="max-w-[320px] rounded-md border border-slate-300 bg-white px-2 py-1 text-[14px] text-slate-800"
+                className="max-w-[320px] rounded-xl border border-slate-300 bg-white px-2 py-1 text-[14px] text-slate-800"
               >
                 {structures.map((s) => (
                   <option key={s.pdb_id} value={s.pdb_id}>
@@ -567,7 +567,7 @@ export default function StructurePage() {
 
       <main className="w-full flex-1 space-y-4 px-4 py-4 lg:px-6">
         {loading ? (
-          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-4 text-[15px] text-slate-600">
+          <div className="flex items-center gap-2 card p-4 text-[15px] text-slate-600">
             <Loader2 size={16} className="animate-spin text-blue-600" />
             Recherche des structures PDB, du modèle AlphaFold et des segments transmembranaires…
           </div>
@@ -761,7 +761,7 @@ export default function StructurePage() {
                   autoHighlightRanges={tmRanges}
                 />
                 {hasAlphafold && structures.length > 0 && (
-                  <details className="rounded-lg border border-slate-200 bg-white p-3">
+                  <details className="card p-3">
                     <summary className="cursor-pointer text-[15px] font-semibold text-slate-900">
                       Analyse du modèle AlphaFold : correspondance des résidus, confiance, géométrie et contacts
                     </summary>
@@ -825,11 +825,11 @@ function Card({
   children: React.ReactNode;
 }) {
   return (
-    <section className="relative overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <section className="relative overflow-hidden card">
       <span className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: tone }} />
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 pb-2.5 pt-3.5">
         <div className="flex items-center gap-2.5">
-          <span className="rounded-md p-2 text-white shadow-sm" style={{ backgroundColor: tone }}>
+          <span className="rounded-lg p-2 text-white shadow-sm" style={{ backgroundColor: tone }}>
             {icon}
           </span>
           <div>
@@ -854,7 +854,7 @@ function EmptyCard({ text }: { text: string }) {
 
 function Field({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
       <dt className="text-[12px] font-medium uppercase tracking-[0.08em] text-slate-500">{label}</dt>
       <dd className={`truncate text-[15px] font-semibold text-slate-900 ${mono ? "font-mono" : ""}`} title={value}>
         {value}
@@ -878,7 +878,7 @@ function SelectedStructureCard({ structure, length }: { structure: PDBStructure;
             href={`https://www.rcsb.org/structure/${structure.pdb_id}`}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
           >
             RCSB
             <ExternalLink size={12} />
@@ -963,7 +963,7 @@ function ValidationVerdict({ metric, value }: { metric: MetricKey; value?: numbe
   const verdict = idx == null ? null : VERDICTS[idx];
   const t = m.thresholds;
   return (
-    <div className="flex flex-col rounded-md border border-slate-200 bg-white p-3">
+    <div className="flex flex-col rounded-lg border border-slate-200 bg-white p-3">
       <div className="flex items-start justify-between gap-2">
         <span className="text-[14px] font-semibold text-slate-800">{m.label}</span>
         <span className="font-mono text-[20px] font-bold leading-none text-slate-900">
@@ -1042,7 +1042,7 @@ function CoverageSummary({
   );
 
   return (
-    <div className="grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[150px_1fr]">
+    <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[150px_1fr]">
       <div>
         <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-slate-500">Couverture</p>
         <p className="text-[28px] font-bold leading-tight text-slate-900">{fmt(percent, 1, " %")}</p>
@@ -1165,13 +1165,13 @@ function AlphaFoldCard({
       actions={
         <div className="flex flex-wrap gap-2">
           {alphafold.pdb_url && (
-            <a href={alphafold.pdb_url} className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50">
+            <a href={alphafold.pdb_url} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50">
               <Download size={12} />
               PDB
             </a>
           )}
           {alphafold.cif_url && (
-            <a href={alphafold.cif_url} className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50">
+            <a href={alphafold.cif_url} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50">
               <Download size={12} />
               mmCIF
             </a>
@@ -1180,7 +1180,7 @@ function AlphaFoldCard({
             href={`https://alphafold.ebi.ac.uk/entry/${accession}`}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
           >
             AlphaFold DB
             <ExternalLink size={12} />
@@ -1205,7 +1205,7 @@ function AlphaFoldCard({
             <img
               src={alphafold.pae_image_url}
               alt="Erreur d’alignement prédite (PAE)"
-              className="aspect-square w-full rounded-md border border-slate-200 object-contain"
+              className="aspect-square w-full rounded-lg border border-slate-200 object-contain"
             />
             <figcaption className="mt-1 text-center text-[12px] text-slate-500">
               Erreur d’alignement prédite (PAE)
@@ -1256,7 +1256,7 @@ function CoverageMap({
         structures.length > 12 && (
           <button
             onClick={() => setShowAll((v) => !v)}
-            className="rounded-md border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
+            className="rounded-lg border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
           >
             {showAll ? "Afficher les 12 premières" : `Afficher les ${structures.length}`}
           </button>
@@ -1358,7 +1358,7 @@ function FocusViewer({
   const pdbNumbered = activeRange?.numbering === "pdb";
 
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <section className="overflow-hidden card">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -1376,7 +1376,7 @@ function FocusViewer({
           {activeRange && (
             <button
               onClick={() => setActiveRange(null)}
-              className="rounded-md border border-slate-200 px-2 py-0.5 font-medium hover:bg-slate-50"
+              className="rounded-lg border border-slate-200 px-2 py-0.5 font-medium hover:bg-slate-50"
             >
               Effacer ({activeRange.label || `${activeRange.start}–${activeRange.end}`})
             </button>
@@ -1574,7 +1574,7 @@ function QualityTab({
   }
   if (loading) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-white">
+      <div className="card">
         <PanelSpinner text={`Analyse de ${selectedPdb.pdb_id}…`} />
       </div>
     );
@@ -1604,7 +1604,7 @@ function QualityTab({
                 href={`https://www.rcsb.org/structure/${selectedPdb.pdb_id}`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
               >
                 Rapport complet
                 <ExternalLink size={12} />
@@ -1688,8 +1688,8 @@ function ContactWindowsChart({
   if (flagged === 0) {
     // Graphique de barres nulles illisible : on l’indique explicitement
     return (
-      <div className="flex items-start gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-4">
-        <span className="rounded-md bg-emerald-600 p-1.5 text-white">
+      <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+        <span className="rounded-lg bg-emerald-600 p-1.5 text-white">
           <ShieldCheck size={16} />
         </span>
         <div>
@@ -1719,7 +1719,7 @@ function ContactWindowsChart({
           <span>{max.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</span>
           <span>0</span>
         </div>
-        <div className="min-w-0 flex-1 overflow-x-auto rounded-md border border-slate-200 bg-white">
+        <div className="min-w-0 flex-1 overflow-x-auto rounded-lg border border-slate-200 bg-white">
         <svg viewBox={`0 0 ${width} ${height}`} className="h-40 w-full min-w-[480px]" preserveAspectRatio="none" role="img" aria-label="Contacts anormaux par fenêtre de 9 résidus">
           {[0.2, 0.5].map((t) => (
             <line
@@ -1796,13 +1796,13 @@ function PDBTable({
       eyebrow="RCSB PDB"
       title={`Structures expérimentales (${total ?? structures.length})`}
       icon={<Database size={16} />}
-      tone="#0f4c81"
+      tone="#4f46e5"
       actions={
         methods.length > 1 && (
           <select
             value={method}
             onChange={(e) => setMethod(e.target.value)}
-            className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[14px]"
+            className="rounded-xl border border-slate-300 bg-white px-2 py-1 text-[14px]"
             aria-label="Filtrer par méthode"
           >
             <option value="all">Toutes les méthodes</option>
@@ -1820,7 +1820,7 @@ function PDBTable({
           Les {structures.length} premières entrées sur {total} sont affichées.
         </p>
       )}
-      <div className="max-h-[520px] overflow-auto rounded-md border border-slate-200">
+      <div className="max-h-[520px] overflow-auto rounded-lg border border-slate-200">
         <table className="w-full text-[14px]">
           <thead className="sticky top-0 bg-slate-50 text-[13px] text-slate-600">
             <tr>
@@ -1847,7 +1847,7 @@ function PDBTable({
                       href={`https://www.rcsb.org/structure/${s.pdb_id}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="font-mono font-semibold text-[#0f4c81] hover:underline"
+                      className="font-mono font-semibold text-indigo-700 hover:underline"
                     >
                       {s.pdb_id}
                     </a>
@@ -1864,7 +1864,7 @@ function PDBTable({
                   <td className="px-3 py-1.5 text-right">
                     <button
                       onClick={() => onSelect(s)}
-                      className="inline-flex items-center gap-1 rounded bg-[#0f4c81] px-2 py-0.5 text-[13px] font-semibold text-white hover:bg-[#0c3d68]"
+                      className="btn-primary gap-1 px-2 py-0.5 text-[13px]"
                     >
                       <CheckCircle2 size={12} />
                       Choisir
@@ -1890,7 +1890,7 @@ function MacromoleculesPanel({ structure }: { structure: PDBStructure }) {
   const molecules = structure.macromolecules ?? [];
   return (
     <Card eyebrow={structure.pdb_id} title="Entités polymères" icon={<Dna size={16} />} tone="#0891b2">
-      <div className="overflow-x-auto rounded-md border border-slate-200">
+      <div className="overflow-x-auto rounded-lg border border-slate-200">
         <table className="w-full text-[14px]">
           <thead className="bg-slate-50 text-[13px] text-slate-600">
             <tr>

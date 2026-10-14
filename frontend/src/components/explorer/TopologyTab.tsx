@@ -45,7 +45,7 @@ export default function TopologyTab({
 
   return (
     <div className="space-y-4">
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <section className="card p-4">
         <h3 className="text-[16px] font-semibold text-slate-900">Topologie de la référence</h3>
         <dl className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
           <InfoBox label="Source des segments" value={TOPOLOGY_SOURCES[topology.source]} />
@@ -83,7 +83,7 @@ export default function TopologyTab({
             />
           </div>
         ) : (
-          <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-[14px] text-amber-900">
+          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-[14px] text-amber-900">
             Aucun segment transmembranaire détecté pour la référence : la protéine n’est peut-être pas membranaire, ou
             ses segments échappent à l’estimation par hydropathie.
           </p>
@@ -93,14 +93,14 @@ export default function TopologyTab({
       {result.topology_comparison ? (
         <TopologyComparison result={result} comparison={result.topology_comparison} selected={selected} onSelect={onSelect} />
       ) : (
-        <p className="rounded-lg border border-slate-200 bg-white p-4 text-[14px] text-slate-600">
+        <p className="card p-4 text-[14px] text-slate-600">
           Comparaison DeepTMHMM / UniProt / structure 3D indisponible pour cette analyse ancienne : recalculez-la (bandeau en haut de la page).
         </p>
       )}
 
       {structure ? (
         <div className="grid gap-4 xl:grid-cols-[1.15fr_1fr]">
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <section className="card p-4">
             <h3 className="flex flex-wrap items-center gap-2 text-[16px] font-semibold text-slate-900">
               Orientation dans la membrane — modèle {structure.source}
               <CalculatedBadge />
@@ -127,7 +127,7 @@ export default function TopologyTab({
             {result.orientation && <OrientationPanel orientation={result.orientation} opm={opm} />}
 
             {!result.orientation && (
-            <section className="rounded-lg border border-slate-200 bg-white p-4">
+            <section className="card p-4">
               <h3 className="text-[16px] font-semibold text-slate-900">Bicouche ajustée (calculée) et comparaison avec OPM</h3>
               <dl className="mt-2 grid gap-2 sm:grid-cols-2">
                 <InfoBox label="Épaisseur hydrophobe (modèle)" value={membrane ? `${membrane.thickness} Å` : "non placée"} />
@@ -161,7 +161,7 @@ export default function TopologyTab({
             )}
 
             {structure.helices.length > 0 && (
-              <section className="rounded-lg border border-slate-200 bg-white">
+              <section className="card">
                 <h3 className="border-b border-slate-100 px-4 py-2.5 text-[16px] font-semibold text-slate-900">Hélices dans le modèle</h3>
                 <div className="max-h-[300px] overflow-auto">
                   <table className="w-full text-[13px]">
@@ -192,7 +192,7 @@ export default function TopologyTab({
           </div>
         </div>
       ) : (
-        <p className="rounded-lg border border-slate-200 bg-white p-4 text-[14px] text-slate-600">
+        <p className="card p-4 text-[14px] text-slate-600">
           Aucune structure 3D n’a pu être obtenue pour la référence (ni AlphaFold DB, ni ESMFold) : l’orientation dans la
           membrane n’est pas disponible. Les zones des résidus sont alors déduites de la topologie seule.
         </p>
@@ -293,7 +293,7 @@ function DepthProfile({
   const y = (z: number) => H / 2 - (z / zMax) * (H / 2 - 10);
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4">
+    <section className="card p-4">
       <h3 className="text-[16px] font-semibold text-slate-900">Profondeur des résidus dans la membrane</h3>
       <p className="mb-2 text-[13px] text-slate-500">
         Position de chaque Cα le long de la normale de la bicouche calculée (0 = centre ; haut = côté externe). Couleur : zone.

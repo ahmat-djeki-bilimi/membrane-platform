@@ -87,7 +87,7 @@ export default function PhylogenyTab({
       return <RerunNotice title="Cette analyse a été lancée avant l’ajout de l’arbre phylogénétique." button="Recalculer avec l’arbre" onRerun={onRerun} />;
     }
     return (
-      <p className="rounded-lg border border-slate-200 bg-white p-4 text-[15px] text-slate-700">
+      <p className="card p-4 text-[15px] text-slate-700">
         Pas d’arbre phylogénétique pour cette analyse : il faut au moins 4 séquences.
       </p>
     );
@@ -128,12 +128,12 @@ export default function PhylogenyTab({
           <RobustnessPanel tree={shown} />
         </div>
       ) : (
-        <p className="rounded-lg border border-slate-200 bg-white p-4 text-[14px] text-slate-600">
+        <p className="card p-4 text-[14px] text-slate-600">
           Diagnostics détaillés indisponibles pour cet arbre ancien : construisez un nouvel arbre ci-dessous.
         </p>
       )}
 
-      <details className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-[13px]">
+      <details className="card px-4 py-3 text-[13px]">
         <summary className="cursor-pointer font-semibold text-slate-800">Limites valables pour tout arbre de ce type</summary>
         <ul className="mt-1 list-disc space-y-1 pl-5 leading-5 text-slate-700">
           {GENERAL_LIMITS.map((text) => (
@@ -142,7 +142,7 @@ export default function PhylogenyTab({
         </ul>
       </details>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <section className="card p-4">
         <PhyloTree key={custom ? treeJobId : "analysis"} tree={shown} selectedId={selectedSpecies} onSelect={setSelectedSpecies} fileBase={fileBase} maxHeight={900} />
       </section>
 
@@ -175,7 +175,7 @@ function TreeSummary({ tree, isAnalysisTree, totalHomologs }: { tree: PhyloTreeD
   const ml = tree.method_id === "ml";
   const d = tree.diagnostics;
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4">
+    <section className="card p-4">
       <h3 className="text-[16px] font-semibold text-slate-900">Fiche de l’arbre</h3>
       <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard
@@ -236,7 +236,7 @@ function LevelBadge({ level }: { level: keyof typeof LEVEL_STYLE }) {
 function DataQualityPanel({ tree }: { tree: PhyloTreeData }) {
   const quality = tree.data_quality!;
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4">
+    <section className="card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-[16px] font-semibold text-slate-900">1. Qualité des données</h3>
         <LevelBadge level={quality.level} />
@@ -264,20 +264,20 @@ function RobustnessPanel({ tree }: { tree: PhyloTreeData }) {
   const r = tree.robustness!;
   const max = Math.max(...r.histogram.map((b) => b.count), 1);
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4">
+    <section className="card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-[16px] font-semibold text-slate-900">2. Robustesse phylogénétique</h3>
         <LevelBadge level={r.level} />
       </div>
       <p className="text-[13px] text-slate-500">Les embranchements obtenus résistent-ils au rééchantillonnage des colonnes ? {r.measure}.</p>
       <dl className="mt-2 grid gap-2 text-[13px] sm:grid-cols-2">
-        <div className="rounded-md bg-slate-50 px-3 py-2">
+        <div className="rounded-lg bg-slate-50 px-3 py-2">
           <dt className="text-slate-500">Branches à support ≥ 70 %</dt>
           <dd className="text-[16px] font-semibold text-slate-900">
             {pct(r.fraction_70)} <span className="text-[13px] font-normal text-slate-500">({r.supported_70} / {r.internal_branches})</span>
           </dd>
         </div>
-        <div className="rounded-md bg-slate-50 px-3 py-2">
+        <div className="rounded-lg bg-slate-50 px-3 py-2">
           <dt className="text-slate-500">Au seuil recommandé ({r.recommended.label})</dt>
           <dd className="text-[16px] font-semibold text-slate-900">
             {pct(r.fraction_recommended)} <span className="text-[13px] font-normal text-slate-500">({r.robust} / {r.internal_branches})</span>
@@ -290,7 +290,7 @@ function RobustnessPanel({ tree }: { tree: PhyloTreeData }) {
           <div key={b.label} className="grid grid-cols-[70px_1fr_32px] items-center gap-2 text-[12px]">
             <span className="text-slate-600">{b.label}</span>
             <span className="h-3 rounded bg-slate-100">
-              <span className="block h-3 rounded bg-[#0f4c81]" style={{ width: `${(b.count / max) * 100}%` }} />
+              <span className="block h-3 rounded bg-gradient-to-r from-indigo-500 to-violet-500" style={{ width: `${(b.count / max) * 100}%` }} />
             </span>
             <span className="text-right tabular-nums text-slate-700">{b.count}</span>
           </div>
@@ -401,7 +401,7 @@ function TreeBuilder({
 
   const strategies = tools?.strategies;
   return (
-    <section className="rounded-lg border border-slate-200 bg-white">
+    <section className="card">
       <div className="border-b border-slate-100 px-4 py-2.5">
         <h3 className="flex items-center gap-2 text-[16px] font-semibold text-slate-900">
           <ListChecks size={16} />
@@ -420,7 +420,7 @@ function TreeBuilder({
             <button
               key={s}
               onClick={() => setStrategy(s)}
-              className={`rounded-md border p-3 text-left text-[13px] ${strategy === s ? "border-[#0f4c81] bg-blue-50 ring-1 ring-[#0f4c81]" : "border-slate-200 hover:bg-slate-50"}`}
+              className={`rounded-lg border p-3 text-left text-[13px] ${strategy === s ? "border-indigo-400 bg-indigo-50/70 ring-2 ring-indigo-200" : "border-slate-200 hover:bg-slate-50"}`}
             >
               <p className="font-semibold text-slate-900">{strategies?.[s].label ?? s}</p>
               <p className="mt-0.5 leading-5 text-slate-600">{strategies?.[s].text}</p>
@@ -438,7 +438,7 @@ function TreeBuilder({
                 max={Math.min(MAX_TREE_SELECTION, candidates.length)}
                 value={count}
                 onChange={(e) => setCount(Math.max(MIN_HOMOLOGS, Math.min(MAX_TREE_SELECTION, candidates.length, Number(e.target.value) || MIN_HOMOLOGS)))}
-                className="w-20 rounded-md border border-slate-300 px-2 py-1 tabular-nums"
+                className="w-20 rounded-xl border border-slate-300 px-2 py-1 tabular-nums"
               />
               <span className="text-slate-500">sur {candidates.length} disponibles</span>
             </label>
@@ -449,12 +449,12 @@ function TreeBuilder({
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder="Filtrer (espèce, identifiant…)"
-            className="ml-auto w-56 rounded-md border border-slate-300 px-2 py-1 outline-none focus:border-blue-500"
+            className="ml-auto w-56 rounded-xl border border-slate-300 px-2 py-1 outline-none focus:border-blue-500"
           />
         </div>
 
         {auto && (
-          <p className="rounded-md bg-slate-50 px-3 py-2 text-[13px] text-slate-700">
+          <p className="rounded-lg bg-slate-50 px-3 py-2 text-[13px] text-slate-700">
             {preview.error ? (
               <span className="text-rose-700">Aperçu impossible : {preview.error}</span>
             ) : !selection ? (
@@ -508,7 +508,7 @@ function TreeBuilder({
       <div className="space-y-3 px-4 py-3">
         <p className="text-[13px] font-semibold text-slate-700">2. Méthode de reconstruction</p>
         <div className="grid gap-2 lg:grid-cols-2">
-          <div className={`rounded-md border p-3 text-[13px] ${method === "nj" ? "border-[#0f4c81] bg-blue-50 ring-1 ring-[#0f4c81]" : "border-slate-200"}`}>
+          <div className={`rounded-lg border p-3 text-[13px] ${method === "nj" ? "border-indigo-400 bg-indigo-50/70 ring-2 ring-indigo-200" : "border-slate-200"}`}>
             <label className="flex cursor-pointer items-center gap-2 font-semibold text-slate-900">
               <input type="radio" checked={method === "nj"} onChange={() => setMethod("nj")} />
               <Zap size={14} /> Neighbor-Joining — rapide (quelques secondes)
@@ -517,7 +517,7 @@ function TreeBuilder({
             <div className="mt-2 flex flex-wrap items-center gap-3">
               <label className="flex items-center gap-1.5">
                 Distance
-                <select value={model} onChange={(e) => setModel(e.target.value as TreeModel)} disabled={method !== "nj"} className="rounded-md border border-slate-300 px-2 py-1">
+                <select value={model} onChange={(e) => setModel(e.target.value as TreeModel)} disabled={method !== "nj"} className="rounded-xl border border-slate-300 px-2 py-1">
                   {DISTANCE_MODELS.map((m) => (
                     <option key={m.value} value={m.value} title={m.text}>
                       {m.label}
@@ -527,7 +527,7 @@ function TreeBuilder({
               </label>
               <label className="flex items-center gap-1.5">
                 Bootstrap
-                <select value={replicates} onChange={(e) => setReplicates(Number(e.target.value) as 100 | 200 | 500)} disabled={method !== "nj"} className="rounded-md border border-slate-300 px-2 py-1">
+                <select value={replicates} onChange={(e) => setReplicates(Number(e.target.value) as 100 | 200 | 500)} disabled={method !== "nj"} className="rounded-xl border border-slate-300 px-2 py-1">
                   {[100, 200, 500].map((r) => (
                     <option key={r} value={r}>
                       {r} réplicats
@@ -538,8 +538,8 @@ function TreeBuilder({
             </div>
           </div>
           <div
-            className={`rounded-md border p-3 text-[13px] ${
-              !mlAvailable ? "border-slate-200 bg-slate-50 opacity-80" : method === "ml" ? "border-[#0f4c81] bg-blue-50 ring-1 ring-[#0f4c81]" : "border-slate-200"
+            className={`rounded-lg border p-3 text-[13px] ${
+              !mlAvailable ? "border-slate-200 bg-slate-50 opacity-80" : method === "ml" ? "border-indigo-400 bg-indigo-50/70 ring-2 ring-indigo-200" : "border-slate-200"
             }`}
           >
             <label className={`flex items-center gap-2 font-semibold text-slate-900 ${mlAvailable ? "cursor-pointer" : "cursor-not-allowed"}`}>
@@ -554,7 +554,7 @@ function TreeBuilder({
                 </p>
                 <label className="mt-2 flex items-center gap-1.5">
                   Modèle
-                  <select value={mlModel} onChange={(e) => setMlModel(e.target.value as "LG+G4" | "MFP")} disabled={method !== "ml"} className="rounded-md border border-slate-300 px-2 py-1">
+                  <select value={mlModel} onChange={(e) => setMlModel(e.target.value as "LG+G4" | "MFP")} disabled={method !== "ml"} className="rounded-xl border border-slate-300 px-2 py-1">
                     {Object.entries(tools?.ml.models ?? {}).map(([value, m]) => (
                       <option key={value} value={value} title={m.text}>
                         {m.label}
@@ -578,7 +578,7 @@ function TreeBuilder({
           <button
             onClick={build}
             disabled={invalid || busy || (auto && !selection) || (method === "ml" && !mlAvailable)}
-            className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-[#0f4c81] px-3 py-1.5 font-semibold text-white hover:bg-[#0c3d68] disabled:cursor-not-allowed disabled:opacity-40"
+            className="btn-primary ml-auto gap-1.5 px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {busy ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
             Construire l’arbre
@@ -640,7 +640,7 @@ function Method({ tree }: { tree: PhyloTreeData }) {
     ]);
   }
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 text-[14px] leading-6 text-slate-600">
+    <section className="card p-4 text-[14px] leading-6 text-slate-600">
       <h3 className="mb-2 text-[16px] font-semibold text-slate-900">Méthode</h3>
       <dl className="grid gap-x-4 gap-y-2 md:grid-cols-[190px_1fr]">
         {items.map(([label, value]) => (

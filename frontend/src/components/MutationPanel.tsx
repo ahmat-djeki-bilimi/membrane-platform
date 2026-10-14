@@ -85,7 +85,7 @@ export default function MutationPanel({
 
   return (
     <div className="space-y-4">
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <section className="card p-4">
         <h3 className="text-[16px] font-semibold text-slate-900">Proposer une substitution</h3>
         <p className="text-[13px] text-slate-500">Cliquez un résidu dans la séquence (numérotation UniProt), puis l’acide aminé à introduire.</p>
         <SequencePicker sequence={sequence} position={position} onPick={choose} />
@@ -101,7 +101,7 @@ export default function MutationPanel({
                 const p = Number(e.target.value);
                 if (p >= 1 && p <= sequence.length) choose(p);
               }}
-              className="w-20 rounded-md border border-slate-300 px-2 py-1 tabular-nums"
+              className="w-20 rounded-xl border border-slate-300 px-2 py-1 tabular-nums"
             />
           </label>
           {wild && (
@@ -140,7 +140,7 @@ export default function MutationPanel({
       </section>
 
       {loading && (
-        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-4 text-[14px] text-slate-500">
+        <div className="flex items-center gap-2 card p-4 text-[14px] text-slate-500">
           <Loader2 size={15} className="animate-spin text-blue-600" />
           Analyse de la substitution…
         </div>
@@ -154,7 +154,7 @@ export default function MutationPanel({
 function SequencePicker({ sequence, position, onPick }: { sequence: string; position: number | null; onPick: (p: number) => void }) {
   const rows = useMemo(() => Array.from({ length: Math.ceil(sequence.length / ROW) }, (_, k) => k * ROW), [sequence]);
   return (
-    <div className="mt-2 max-h-56 overflow-auto rounded-md border border-slate-200 p-2 font-mono text-[12px]">
+    <div className="mt-2 max-h-56 overflow-auto rounded-lg border border-slate-200 p-2 font-mono text-[12px]">
       {rows.map((start) => (
         <div key={start} className="flex">
           <span className="w-12 shrink-0 pr-2 text-right text-slate-400">{start + 1}</span>
@@ -203,7 +203,7 @@ function Analysis({ data, onPickMutant, onFocus }: { data: MutationAnalysis; onP
             ))}
           </span>
         </div>
-        <p className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] leading-5 text-slate-700">
+        <p className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] leading-5 text-slate-700">
           <b>Hypothèses, pas des prédictions.</b> Les éléments ci-dessous décrivent la substitution et son contexte. Ils ne permettent pas
           de dire si la mutation est délétère, neutre ou si elle modifie la fonction : seule l’expérience permet de conclure.
         </p>
@@ -212,7 +212,7 @@ function Analysis({ data, onPickMutant, onFocus }: { data: MutationAnalysis; onP
             const items = data.hypotheses.filter((h) => h.kind === group.kind);
             if (!items.length) return null;
             return (
-              <div key={group.kind} className={`rounded-md border p-3 ${group.tone}`}>
+              <div key={group.kind} className={`rounded-lg border p-3 ${group.tone}`}>
                 <p className="flex items-center gap-1.5 text-[14px] font-semibold">
                   {group.icon}
                   {group.title}
@@ -233,7 +233,7 @@ function Analysis({ data, onPickMutant, onFocus }: { data: MutationAnalysis; onP
       </section>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
+        <section className="card p-4">
           <h3 className="text-[16px] font-semibold text-slate-900">Propriétés physico-chimiques</h3>
           <table className="mt-2 w-full text-[13px]">
             <thead className="text-left text-slate-500">
@@ -257,7 +257,7 @@ function Analysis({ data, onPickMutant, onFocus }: { data: MutationAnalysis; onP
           </p>
         </section>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
+        <section className="card p-4">
           <h3 className="text-[16px] font-semibold text-slate-900">Conservation évolutive</h3>
           {["queued", "running"].includes(c.status) ? (
             <p className="mt-2 flex items-center gap-2 text-[14px] text-slate-600">
@@ -295,7 +295,7 @@ function Analysis({ data, onPickMutant, onFocus }: { data: MutationAnalysis; onP
         </section>
       </div>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <section className="card p-4">
         <h3 className="text-[16px] font-semibold text-slate-900">Environnement structural et contacts locaux</h3>
         <dl className="mt-2 grid gap-2 text-[13px] sm:grid-cols-2 xl:grid-cols-4">
           <Fact label="Membrane (UniProt)" value={data.membrane.zone === "transmembranaire" || data.membrane.zone === "intramembranaire" ? `${data.membrane.zone} ${data.membrane.segment}${data.membrane.core ? ", cœur de la bicouche" : ", près de l’interface"}` : data.membrane.zone === "hors membrane" ? `hors membrane (${data.membrane.side})` : "non annotée"} />
@@ -351,7 +351,7 @@ function Analysis({ data, onPickMutant, onFocus }: { data: MutationAnalysis; onP
         )}
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <section className="card p-4">
         <h3 className="text-[16px] font-semibold text-slate-900">Annotations fonctionnelles disponibles</h3>
         <div className="mt-2 grid gap-3 text-[13px] lg:grid-cols-2">
           <div>
@@ -408,7 +408,7 @@ function Analysis({ data, onPickMutant, onFocus }: { data: MutationAnalysis; onP
         </div>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <section className="card p-4">
         <h3 className="text-[16px] font-semibold text-slate-900">Les 19 substitutions possibles à la position {data.position}</h3>
         <p className="text-[13px] text-slate-500">Mesures simples, sans classement par « gravité ». Cliquez une ligne pour l’analyser.</p>
         <div className="mt-2 overflow-x-auto">
@@ -443,7 +443,7 @@ function Analysis({ data, onPickMutant, onFocus }: { data: MutationAnalysis; onP
         </div>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <section className="card p-4">
         <h3 className="flex items-center gap-1.5 text-[15px] font-semibold text-slate-900">
           <FlaskConical size={15} />
           Ce que cette analyse ne peut pas dire
@@ -471,7 +471,7 @@ function Row({ label, a, b, delta }: { label: string; a: string; b: string; delt
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md bg-slate-50 px-3 py-2">
+    <div className="rounded-lg bg-slate-50 px-3 py-2">
       <dt className="text-slate-500">{label}</dt>
       <dd className="font-semibold text-slate-900">{value}</dd>
     </div>

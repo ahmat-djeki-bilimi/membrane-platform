@@ -87,7 +87,7 @@ export default function ImportPanel({
   };
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white">
+    <section className="card">
       <div className="border-b border-slate-100 px-4 py-3">
         <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-blue-700">Étape 1</p>
         <h2 className="text-[17px] font-semibold text-slate-900">Protéines membranaires homologues : importation FASTA</h2>
@@ -104,13 +104,13 @@ export default function ImportPanel({
             onChange={(e) => setFasta(e.target.value)}
             spellCheck={false}
             placeholder={">sp|P02945|BACR_HALSA Bacteriorhodopsin OS=Halobacterium salinarum\nMLELLPTAVEGVSQAQITGRPEWIWLALGTALMGLGTLYFLVKG...\n>homologue_2\n..."}
-            className="h-64 w-full resize-y rounded-md border border-slate-300 bg-slate-50 p-3 font-mono text-[13px] leading-5 text-slate-800 outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
+            className="h-64 w-full resize-y rounded-xl border border-slate-300 bg-slate-50 p-3 font-mono text-[13px] leading-5 text-slate-800 outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
           />
           <div className="flex flex-wrap items-center gap-2 text-[13px]">
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="inline-flex items-center gap-1.5 rounded-md bg-white px-3 py-1.5 font-semibold text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 font-semibold text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50"
             >
               <FileUp size={14} />
               Importer un fichier
@@ -127,7 +127,7 @@ export default function ImportPanel({
               }}
             />
             {fasta && (
-              <button type="button" onClick={() => setFasta("")} className="rounded-md px-2 py-1.5 font-semibold text-slate-500 hover:text-slate-800">
+              <button type="button" onClick={() => setFasta("")} className="rounded-lg px-2 py-1.5 font-semibold text-slate-500 hover:text-slate-800">
                 Effacer
               </button>
             )}
@@ -141,14 +141,14 @@ export default function ImportPanel({
             </span>
           </div>
           {loadMessage && (
-            <p className={`rounded-md px-3 py-2 text-[13px] ${loadMessage.tone === "emerald" ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800"}`}>
+            <p className={`rounded-lg px-3 py-2 text-[13px] ${loadMessage.tone === "emerald" ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800"}`}>
               {loadMessage.text}
             </p>
           )}
         </div>
 
         <div className="space-y-4 text-[14px]">
-          <div className="rounded-md border border-slate-200 p-3">
+          <div className="rounded-lg border border-slate-200 p-3">
             <p className="flex items-center gap-1.5 font-semibold text-slate-900">
               <Download size={14} className="text-blue-600" />
               Partir d’une entrée UniProt
@@ -165,11 +165,11 @@ export default function ImportPanel({
                 value={lookup}
                 onChange={(e) => setLookup(e.target.value.toUpperCase())}
                 placeholder="ex. P02945"
-                className="min-w-0 flex-1 rounded-md border border-slate-300 px-2 py-1.5 font-mono text-[13px] outline-none focus:border-blue-500"
+                className="min-w-0 flex-1 rounded-xl border border-slate-300 px-2 py-1.5 font-mono text-[13px] outline-none focus:border-blue-500"
               />
               <button
                 disabled={!!loading || !lookup.trim()}
-                className="rounded-md bg-slate-800 px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-slate-700 disabled:opacity-40"
+                className="rounded-lg bg-slate-800 px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-slate-700 disabled:opacity-40"
               >
                 Charger
               </button>
@@ -199,7 +199,7 @@ export default function ImportPanel({
                 value={referenceIndex}
                 onChange={(e) => setReference(Number(e.target.value))}
                 disabled={count === 0}
-                className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[13px] disabled:bg-slate-50"
+                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-2 py-1.5 text-[13px] disabled:bg-slate-50"
               >
                 {preview.records.slice(0, MAX_SEQUENCES).map((r, i) => (
                   <option key={i} value={i}>
@@ -215,10 +215,10 @@ export default function ImportPanel({
                 value={accession}
                 onChange={(e) => setAccession(e.target.value.toUpperCase())}
                 placeholder="reconnue automatiquement si possible"
-                className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 font-mono text-[13px] outline-none focus:border-blue-500"
+                className="mt-1 w-full rounded-xl border border-slate-300 px-2 py-1.5 font-mono text-[13px] outline-none focus:border-blue-500"
               />
             </label>
-            <label className="flex items-start gap-2 rounded-md bg-slate-50 p-2">
+            <label className="flex items-start gap-2 rounded-lg bg-slate-50 p-2">
               <input type="checkbox" className="mt-1" checked={expand} onChange={(e) => setExpand(e.target.checked)} />
               <span>
                 <span className="font-semibold text-slate-900">Recherche étendue (MMseqs2)</span>
@@ -229,7 +229,7 @@ export default function ImportPanel({
             </label>
           </div>
 
-          {problem && count > 0 && <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">{problem}</p>}
+          {problem && count > 0 && <p className="rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-800">{problem}</p>}
           {error && (
             <Alert tone="rose" title="Analyse impossible">
               {error}
@@ -240,7 +240,7 @@ export default function ImportPanel({
             type="button"
             disabled={count === 0 || !!problem || submitting}
             onClick={() => onSubmit({ fasta, reference: referenceIndex, accession: accession.trim() || null, expand })}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#0f4c81] px-4 py-2.5 text-[15px] font-semibold text-white shadow-sm hover:bg-[#0b3a63] disabled:cursor-not-allowed disabled:opacity-40"
+            className="btn-primary w-full gap-2 px-4 py-2.5 text-[15px] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {submitting ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
             Lancer l’analyse
