@@ -79,12 +79,12 @@ function ComparisonStart() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#eef2f6] text-slate-900">
+    <div className="flex min-h-screen flex-col app-bg text-slate-900">
       <SiteHeader active="comparison" />
       <section className={HERO_BG}>
         <div aria-hidden className={HERO_GLOW} />
         <div className="relative w-full px-4 py-6 lg:px-6">
-          <nav className="flex items-center gap-1 text-[13px] text-blue-200">
+          <nav className="flex items-center gap-1 text-[13px] text-indigo-200">
             <Link href="/" className="hover:text-white">
               Accueil
             </Link>
@@ -95,7 +95,7 @@ function ComparisonStart() {
             <GitCompare size={26} />
             Comparer des protéines
           </h1>
-          <p className="mt-1 max-w-3xl text-[15px] text-blue-100">
+          <p className="mt-1 max-w-3xl text-[15px] text-indigo-100">
             De {MIN_PROTEINS} à {MAX_PROTEINS} entrées UniProt : séquences, structures 3D, domaines, topologies, positions conservées et
             propriétés physico-chimiques, dans un même repère de résidus.
           </p>
@@ -103,7 +103,7 @@ function ComparisonStart() {
       </section>
 
       <main className="w-full flex-1 space-y-4 px-4 py-5 lg:px-6">
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
+        <section className="card p-4">
           <h2 className="text-[16px] font-semibold text-slate-900">Protéines à comparer</h2>
           <form
             onSubmit={(e) => {
@@ -116,9 +116,9 @@ function ComparisonStart() {
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               placeholder="Accession UniProt (ex. P02945), une ou plusieurs séparées par des virgules"
-              className="min-w-[280px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-[14px] outline-none focus:border-blue-500"
+              className="min-w-[280px] flex-1 rounded-xl border border-slate-300 px-3 py-2 text-[14px] outline-none focus:border-blue-500"
             />
-            <button type="submit" disabled={!draft.trim() || ids.length >= MAX_PROTEINS} className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-[14px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40">
+            <button type="submit" disabled={!draft.trim() || ids.length >= MAX_PROTEINS} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-3 py-2 text-[14px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40">
               <Plus size={14} />
               Ajouter
             </button>
@@ -127,7 +127,7 @@ function ComparisonStart() {
           {ids.length > 0 && (
             <ul className="mt-3 flex flex-wrap gap-2">
               {ids.map((id, k) => (
-                <li key={id} className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 py-1 pl-2 pr-1 text-[14px]">
+                <li key={id} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 py-1 pl-2 pr-1 text-[14px]">
                   <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: proteinColor(k) }} />
                   <span className="font-mono font-semibold">{id}</span>
                   <button
@@ -151,7 +151,7 @@ function ComparisonStart() {
             <button
               onClick={() => submit()}
               disabled={ids.length < MIN_PROTEINS || submitting}
-              className="inline-flex items-center gap-1.5 rounded-md bg-[#0f4c81] px-4 py-2 text-[14px] font-semibold text-white hover:bg-[#0c3d68] disabled:cursor-not-allowed disabled:opacity-40"
+              className="btn-primary gap-1.5 px-4 py-2 text-[14px] disabled:cursor-not-allowed disabled:opacity-40"
             >
               {submitting ? <Loader2 size={14} className="animate-spin" /> : <GitCompare size={14} />}
               Comparer {ids.length >= MIN_PROTEINS ? `${ids.length} protéines` : ""}
@@ -162,7 +162,7 @@ function ComparisonStart() {
           </div>
         </section>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
+        <section className="card p-4">
           <h2 className="text-[16px] font-semibold text-slate-900">Exemples</h2>
           <div className="mt-2 grid gap-2 md:grid-cols-3">
             {EXAMPLES.map((e) => (
@@ -174,7 +174,7 @@ function ComparisonStart() {
                   submit(e.ids, 0);
                 }}
                 disabled={submitting}
-                className="rounded-md border border-slate-200 p-3 text-left hover:border-[#0f4c81] disabled:opacity-50"
+                className="rounded-lg border border-slate-200 p-3 text-left hover:border-indigo-300 disabled:opacity-50"
               >
                 <p className="text-[14px] font-semibold text-slate-900">{e.label}</p>
                 <p className="text-[13px] text-slate-500">{e.text}</p>
@@ -186,7 +186,7 @@ function ComparisonStart() {
 
         <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
           {FEATURES.map(([title, text]) => (
-            <div key={title} className="rounded-lg border border-slate-200 bg-white p-3">
+            <div key={title} className="card p-3">
               <p className="text-[14px] font-semibold text-slate-900">{title}</p>
               <p className="mt-0.5 text-[13px] leading-5 text-slate-500">{text}</p>
             </div>

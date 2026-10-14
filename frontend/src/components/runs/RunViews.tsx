@@ -24,7 +24,7 @@ export function StatusBadge({ status, stale = false }: { status: string; stale?:
 
 export function Section({ title, subtitle, children, right }: { title: string; subtitle?: React.ReactNode; children: React.ReactNode; right?: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4">
+    <section className="card p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="text-[16px] font-semibold text-slate-900">{title}</h2>
@@ -61,7 +61,7 @@ export function StepsTimeline({ steps }: { steps: RunStep[] }) {
               {step.cache_hits > 0 && <span className="rounded bg-slate-100 px-1.5 text-[12px] text-slate-600">{step.cache_hits} réponse(s) relue(s) du cache</span>}
             </p>
             <div className="mt-0.5 h-1.5 rounded bg-slate-100">
-              <div className={`h-1.5 rounded ${step.status === "failed" ? "bg-rose-500" : "bg-[#0f4c81]"}`} style={{ width: `${Math.max(((step.duration ?? 0) / longest) * 100, 1)}%` }} />
+              <div className={`h-1.5 rounded ${step.status === "failed" ? "bg-rose-500" : "bg-gradient-to-r from-indigo-500 to-violet-500"}`} style={{ width: `${Math.max(((step.duration ?? 0) / longest) * 100, 1)}%` }} />
             </div>
             {step.error && <p className="mt-0.5 text-[13px] text-rose-700">{step.error}</p>}
           </div>
@@ -139,11 +139,11 @@ export function InputsList({ run }: { run: Run }) {
 }
 
 export function Exports({ run }: { run: Run }) {
-  const link = "inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-[13px] font-semibold text-slate-700 hover:bg-slate-50";
+  const link = "inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-3 py-1.5 text-[13px] font-semibold text-slate-700 hover:bg-slate-50";
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
-        <a href={reportUrl(run.id)} className="inline-flex items-center gap-1.5 rounded-md bg-[#0f4c81] px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-[#0c3d68]">
+        <a href={reportUrl(run.id)} className="btn-primary gap-1.5 px-3 py-1.5 text-[13px]">
           <FileText size={14} />
           Rapport scientifique (PDF)
         </a>

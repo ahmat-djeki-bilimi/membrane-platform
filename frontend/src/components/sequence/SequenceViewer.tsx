@@ -47,7 +47,7 @@ export default function SequenceViewer({
   const selected = selectedSegment !== null ? segments[selectedSegment] : null;
 
   return (
-    <div className="max-h-[360px] overflow-auto rounded-md border border-slate-200 bg-white p-3 font-mono text-[14px] leading-6">
+    <div className="max-h-[360px] overflow-auto rounded-lg border border-slate-200 bg-white p-3 font-mono text-[14px] leading-6">
       {rows.map((start) => {
         const end = Math.min(start + ROW_LENGTH - 1, sequence.length);
         return (

@@ -66,12 +66,12 @@ export default function ComparisonView({
         </p>
       )}
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <section className="card p-4">
         <h3 className="text-[16px] font-semibold text-slate-900">Recouvrement des deux méthodes</h3>
         <p className="mb-3 text-[13px] text-slate-500">
           MIp : résidus engagés dans au moins une paire forte (z ≥ 3). SCA : résidus membres d’un secteur.
         </p>
-        <div className="flex h-9 overflow-hidden rounded-md text-[13px] font-semibold text-white">
+        <div className="flex h-9 overflow-hidden rounded-lg text-[13px] font-semibold text-white">
           {comparison.mip_only > 0 && (
             <div className="flex items-center justify-center" style={{ width: `${pct(comparison.mip_only)}%`, backgroundColor: MIP_ONLY }}>
               {comparison.mip_only}
@@ -107,7 +107,7 @@ export default function ComparisonView({
 
       <div className={`grid gap-4 ${result.structure ? "xl:grid-cols-[1.2fr_1fr]" : ""}`}>
         {result.structure && (
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <section className="card p-4">
             <h3 className="text-[16px] font-semibold text-slate-900">Les deux méthodes sur la structure dans la membrane</h3>
             <p className="mb-2 text-[13px] text-slate-500">En bâtonnets : les résidus désignés par les deux méthodes.</p>
             <ExplorerViewer
@@ -128,7 +128,7 @@ export default function ComparisonView({
         )}
 
         <div className="space-y-4">
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <section className="card p-4">
             <h3 className="text-[16px] font-semibold text-slate-900">Résidus désignés par les deux méthodes</h3>
             <p className="mb-2 text-[13px] text-slate-500">Les candidats les plus solides : deux approches indépendantes les retiennent.</p>
             <div className="flex flex-wrap gap-1.5">
@@ -149,7 +149,7 @@ export default function ComparisonView({
             </div>
           </section>
 
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <section className="card p-4">
             <h3 className="text-[16px] font-semibold text-slate-900">Position dans la membrane</h3>
             <table className="mt-2 w-full text-[13px]">
               <thead className="text-left text-slate-500">
@@ -173,7 +173,7 @@ export default function ComparisonView({
             </table>
           </section>
 
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <section className="card p-4">
             <h3 className="text-[16px] font-semibold text-slate-900">Chaque secteur vu par la MIp</h3>
             <ul className="mt-2 space-y-1.5 text-[13px]">
               {comparison.per_sector.map((s) => (
@@ -196,7 +196,7 @@ export default function ComparisonView({
         </div>
       </div>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4 text-[14px] leading-6 text-slate-600">
+      <section className="card p-4 text-[14px] leading-6 text-slate-600">
         <h3 className="mb-1 text-[16px] font-semibold text-slate-900">Pourquoi les deux méthodes diffèrent</h3>
         <p>
           La <b>MIp</b> mesure la dépendance entre deux positions, quelle que soit leur conservation : elle repère surtout
@@ -213,7 +213,7 @@ export default function ComparisonView({
 
 function Fact({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
       <dt className="text-[12px] font-medium uppercase tracking-[0.08em] text-slate-500">{label}</dt>
       <dd className="text-[20px] font-bold text-slate-900">{value}</dd>
       <dd className="text-[12px] text-slate-500">{hint}</dd>

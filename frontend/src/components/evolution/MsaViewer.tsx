@@ -136,13 +136,13 @@ export default function MsaViewer({
   return (
     <div>
       <div className="mb-2 flex flex-wrap items-center gap-2 text-[14px]">
-        <button onClick={() => go(start - WINDOW)} disabled={start <= 1} className="rounded-md border border-slate-200 p-1 hover:bg-slate-50 disabled:opacity-40" aria-label="Positions précédentes">
+        <button onClick={() => go(start - WINDOW)} disabled={start <= 1} className="rounded-lg border border-slate-200 p-1 hover:bg-slate-50 disabled:opacity-40" aria-label="Positions précédentes">
           <ChevronLeft size={16} />
         </button>
         <span className="font-mono text-slate-700">
           Positions {start}–{end} / {length}
         </span>
-        <button onClick={() => go(start + WINDOW)} disabled={end >= length} className="rounded-md border border-slate-200 p-1 hover:bg-slate-50 disabled:opacity-40" aria-label="Positions suivantes">
+        <button onClick={() => go(start + WINDOW)} disabled={end >= length} className="rounded-lg border border-slate-200 p-1 hover:bg-slate-50 disabled:opacity-40" aria-label="Positions suivantes">
           <ChevronRight size={16} />
         </button>
         <input
@@ -151,12 +151,12 @@ export default function MsaViewer({
           max={Math.max(1, length - WINDOW + 1)}
           value={start}
           onChange={(e) => setStart(Number(e.target.value))}
-          className="min-w-[160px] flex-1 accent-[#0f4c81]"
+          className="min-w-[160px] flex-1 accent-indigo-600"
           aria-label="Déplacer la fenêtre"
         />
         {!!treeOrder?.length && (
           <label className="flex items-center gap-1.5 text-slate-700">
-            <input type="checkbox" checked={sortByTree} onChange={(e) => setSortByTree(e.target.checked)} className="accent-[#0f4c81]" />
+            <input type="checkbox" checked={sortByTree} onChange={(e) => setSortByTree(e.target.checked)} className="accent-indigo-600" />
             Ordre de l’arbre
           </label>
         )}
@@ -168,7 +168,7 @@ export default function MsaViewer({
         )}
       </div>
 
-      <div ref={containerRef} className="overflow-x-auto rounded-md border border-slate-200">
+      <div ref={containerRef} className="overflow-x-auto rounded-lg border border-slate-200">
         <table className="w-full font-mono text-[13px] leading-5">
           <tbody>
             <tr className="bg-slate-50 text-[11px] text-slate-400">
@@ -240,7 +240,7 @@ export default function MsaViewer({
               </td>
             </tr>
             <tr className="border-b border-slate-200">
-              <td className="sticky left-0 w-[200px] min-w-[200px] max-w-[200px] truncate bg-white px-2 font-sans text-[13px] font-semibold text-[#0f4c81]">
+              <td className="sticky left-0 w-[200px] min-w-[200px] max-w-[200px] truncate bg-white px-2 font-sans text-[13px] font-semibold text-indigo-700">
                 Protéine étudiée
               </td>
               <td className="whitespace-nowrap px-2">{columns.map((p) => cell(query[p - 1], p, true))}</td>
@@ -292,7 +292,7 @@ export default function MsaViewer({
           )}
         </span>
         {rows.length > 30 && (
-          <button onClick={() => setShowAll((v) => !v)} className="font-medium text-[#0f4c81] hover:underline">
+          <button onClick={() => setShowAll((v) => !v)} className="font-medium text-indigo-700 hover:underline">
             {showAll ? "Afficher 30 séquences" : `Afficher les ${rows.length} séquences`}
           </button>
         )}

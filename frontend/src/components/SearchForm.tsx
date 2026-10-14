@@ -72,7 +72,7 @@ export default function SearchForm({
 
   return (
     <div>
-      <div role="tablist" aria-label="Type de recherche" className="mb-2 inline-flex rounded-md bg-white/10 p-0.5">
+      <div role="tablist" aria-label="Type de recherche" className="mb-2.5 inline-flex rounded-xl border border-white/15 bg-white/10 p-1 backdrop-blur">
         {(
           [
             ["accession", "Accession UniProt"],
@@ -85,8 +85,8 @@ export default function SearchForm({
             role="tab"
             aria-selected={mode === key}
             onClick={() => switchMode(key)}
-            className={`rounded px-3 py-1 text-[14px] font-semibold transition ${
-              mode === key ? "bg-white text-[#0f4c81] shadow-sm" : "text-blue-100 hover:text-white"
+            className={`rounded-lg px-3 py-1 text-[14px] font-semibold transition ${
+              mode === key ? "bg-white text-indigo-700 shadow-md shadow-indigo-950/20" : "text-indigo-100 hover:text-white"
             }`}
           >
             {label}
@@ -140,7 +140,7 @@ export default function SearchForm({
               className={inputClass(!!error, "resize-y px-3 py-2 text-[14px] leading-5")}
             />
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[13px] text-blue-200">
+              <p className="text-[13px] text-indigo-200">
                 Séquence brute ou FASTA · espaces et numéros ignorés · seule la première
                 séquence d’un FASTA multiple est analysée.
               </p>
@@ -159,17 +159,17 @@ export default function SearchForm({
 
       {showExamples && mode === "accession" && (
         <div className="mt-3 flex flex-wrap items-center gap-x-1 gap-y-1.5 text-[14px]">
-          <span className="mr-1 text-blue-200">Exemples :</span>
+          <span className="mr-1 text-indigo-200">Exemples :</span>
           {EXAMPLE_ACCESSIONS.map((ex) => (
             <button
               key={ex.accession}
               type="button"
               onClick={() => searchAccession(ex.accession)}
-              className="rounded border border-white/20 bg-white/10 px-2 py-1 text-white transition hover:border-cyan-300/60 hover:bg-white/20"
+              className="rounded-lg border border-white/15 bg-white/10 px-2 py-1 text-white backdrop-blur transition hover:-translate-y-0.5 hover:border-cyan-300/60 hover:bg-white/20"
               title={ex.name}
             >
               <span className="font-mono font-semibold">{ex.accession}</span>
-              <span className="ml-1.5 text-blue-100">{ex.name}</span>
+              <span className="ml-1.5 text-indigo-100">{ex.name}</span>
             </button>
           ))}
         </div>
@@ -179,8 +179,8 @@ export default function SearchForm({
 }
 
 function inputClass(hasError: boolean, extra: string) {
-  return `w-full rounded-md border bg-white font-mono text-[16px] text-slate-900 outline-none transition placeholder:font-sans placeholder:text-slate-400 focus:ring-2 ${extra} ${
-    hasError ? "border-red-400 focus:ring-red-300/50" : "border-transparent focus:ring-cyan-300/60"
+  return `w-full rounded-xl border bg-white font-mono shadow-lg shadow-indigo-950/20 text-[16px] text-slate-900 outline-none transition placeholder:font-sans placeholder:text-slate-400 focus:ring-2 ${extra} ${
+    hasError ? "border-red-400 focus:ring-red-300/50" : "border-transparent focus:ring-4 focus:ring-cyan-300/50"
   }`;
 }
 
@@ -188,7 +188,7 @@ function SubmitButton() {
   return (
     <button
       type="submit"
-      className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-gradient-to-r from-cyan-500 to-emerald-500 px-5 py-2.5 text-[15px] font-semibold text-white shadow-lg shadow-cyan-900/30 transition hover:from-cyan-400 hover:to-emerald-400"
+      className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 via-sky-500 to-fuchsia-500 px-5 py-2.5 text-[15px] font-bold text-white shadow-lg shadow-fuchsia-900/40 transition hover:brightness-110"
     >
       Lancer l’analyse
       <ArrowRight size={15} />

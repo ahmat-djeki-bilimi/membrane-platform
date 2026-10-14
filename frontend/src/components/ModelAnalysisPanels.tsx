@@ -21,7 +21,7 @@ function useAnalysis(accession: string): { data?: ModelAnalysis; node?: React.Re
   if (loading)
     return {
       node: (
-        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-4 text-[14px] text-slate-600">
+        <div className="flex items-center gap-2 card p-4 text-[14px] text-slate-600">
           <Loader2 size={16} className="animate-spin text-blue-600" />
           Analyse du modèle AlphaFold (géométrie, contacts, poches)…
         </div>
@@ -30,7 +30,7 @@ function useAnalysis(accession: string): { data?: ModelAnalysis; node?: React.Re
   if (error || !data?.available)
     return {
       node: (
-        <div className="rounded-lg border border-slate-200 bg-white p-4 text-[14px] text-slate-600">
+        <div className="card p-4 text-[14px] text-slate-600">
           Analyse du modèle AlphaFold impossible : {error ?? "modèle indisponible."}
         </div>
       ),
@@ -86,7 +86,7 @@ export function ModelSitesPanel({ accession, onFocus }: { accession: string; onF
     <div className="space-y-4">
       <ModelBanner data={data} />
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <section className="card p-4">
         <h3 className="text-[16px] font-semibold text-slate-900">Trois niveaux de preuve, à ne pas confondre</h3>
         <div className="mt-2 grid gap-2 text-[13px] md:grid-cols-3">
           <Level icon={<FlaskConical size={15} />} tone="border-emerald-200 bg-emerald-50 text-emerald-900" title={`Sites confirmés expérimentalement (${confirmed.length})`}>
@@ -101,7 +101,7 @@ export function ModelSitesPanel({ accession, onFocus }: { accession: string; onF
         </div>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white">
+      <section className="card">
         <h3 className="border-b border-slate-100 px-4 py-2.5 text-[16px] font-semibold text-slate-900">Sites annotés dans UniProt</h3>
         {data.sites.length === 0 ? (
           <p className="px-4 py-3 text-[14px] text-slate-600">Aucun site actif, site de liaison ni site particulier annoté pour cette protéine.</p>
@@ -149,7 +149,7 @@ export function ModelSitesPanel({ accession, onFocus }: { accession: string; onF
         )}
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white">
+      <section className="card">
         <div className="border-b border-slate-100 px-4 py-2.5">
           <h3 className="text-[16px] font-semibold text-slate-900">Poches potentielles du modèle</h3>
           <p className="text-[13px] text-slate-500">
@@ -204,7 +204,7 @@ export function ModelSitesPanel({ accession, onFocus }: { accession: string; onF
 
 function Level({ icon, tone, title, children }: { icon: React.ReactNode; tone: string; title: string; children: React.ReactNode }) {
   return (
-    <div className={`rounded-md border px-3 py-2 ${tone}`}>
+    <div className={`rounded-lg border px-3 py-2 ${tone}`}>
       <p className="flex items-center gap-1.5 font-semibold">
         {icon}
         {title}
@@ -216,7 +216,7 @@ function Level({ icon, tone, title, children }: { icon: React.ReactNode; tone: s
 
 function Limits({ limits }: { limits: string[] }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4">
+    <section className="card p-4">
       <h3 className="text-[15px] font-semibold text-slate-900">Limites de l’analyse d’un modèle</h3>
       <ul className="mt-1 list-disc space-y-1 pl-5 text-[13px] leading-5 text-slate-700">
         {limits.map((l) => (
@@ -243,7 +243,7 @@ export function ModelGeometryPanel({ accession, onFocus }: { accession: string; 
     <div className="space-y-4">
       <ModelBanner data={data} />
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <section className="card p-4">
         <h3 className="text-[16px] font-semibold text-slate-900">Correspondance séquence UniProt ↔ modèle</h3>
         <p className={`mt-1 text-[14px] ${mapping.status === "exacte" ? "text-emerald-800" : "text-rose-800"}`}>{mapping.text}</p>
         <dl className="mt-2 grid gap-2 text-[13px] sm:grid-cols-2 xl:grid-cols-4">
@@ -262,7 +262,7 @@ export function ModelGeometryPanel({ accession, onFocus }: { accession: string; 
         <p className="mt-2 text-[12px] text-slate-500">Vérifié contre : {mapping.checked_against}. Trous de numérotation dans le modèle : {mapping.numbering_gaps}.</p>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <section className="card p-4">
         <h3 className="text-[16px] font-semibold text-slate-900">Confiance du modèle (pLDDT)</h3>
         <PlddtProfile values={confidence.per_residue} onFocus={onFocus} />
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-slate-600">
@@ -285,7 +285,7 @@ export function ModelGeometryPanel({ accession, onFocus }: { accession: string; 
         )}
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <section className="card p-4">
         <h3 className="text-[16px] font-semibold text-slate-900">Géométrie</h3>
         <dl className="mt-2 grid gap-2 text-[13px] sm:grid-cols-2 xl:grid-cols-4">
           <Fact
@@ -317,7 +317,7 @@ export function ModelGeometryPanel({ accession, onFocus }: { accession: string; 
         )}
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <section className="card p-4">
         <h3 className="text-[16px] font-semibold text-slate-900">Contacts entre résidus</h3>
         <p className="text-[13px] text-slate-500">
           Cβ (Cα pour la glycine) à moins de {contacts.cutoff} Å, résidus séparés d’au moins {contacts.min_separation} positions. Couleur : pLDDT le plus faible des deux résidus.
@@ -350,7 +350,7 @@ export function ModelGeometryPanel({ accession, onFocus }: { accession: string; 
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md bg-slate-50 px-3 py-2">
+    <div className="rounded-lg bg-slate-50 px-3 py-2">
       <dt className="text-slate-500">{label}</dt>
       <dd className="font-semibold text-slate-900">{value}</dd>
     </div>

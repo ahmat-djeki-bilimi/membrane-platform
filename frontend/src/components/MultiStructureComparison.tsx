@@ -47,7 +47,7 @@ export default function MultiStructureComparison({
     <section className="rounded border border-slate-200 bg-white p-3 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Columns2 size={17} className="text-[#0f4c81]" />
+          <Columns2 size={17} className="text-indigo-700" />
           <div>
             <h2 className="text-[16px] font-bold text-slate-900">Comparaison multi-structures</h2>
             <p className="text-[13px] text-slate-500">

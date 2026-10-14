@@ -110,14 +110,14 @@ export default function StructuralDomains({
     activeRange?.start === r.start && activeRange?.end === r.end;
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white">
+    <section className="card">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
         <SectionTitle />
         <div className="flex items-center gap-2">
           {activeRange && (
             <button
               onClick={onClearFocus}
-              className="rounded-md border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-600 hover:bg-slate-50"
+              className="rounded-lg border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-600 hover:bg-slate-50"
             >
               Réinitialiser la sélection
             </button>
@@ -136,17 +136,17 @@ export default function StructuralDomains({
             Chargement des annotations UniProt…
           </div>
         ) : error ? (
-          <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-[14px] text-amber-900">
+          <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-[14px] text-amber-900">
             {error}
           </p>
         ) : domains.length === 0 ? (
-          <p className="rounded-md border border-slate-200 bg-slate-50 p-3 text-[14px] text-slate-600">
+          <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-[14px] text-slate-600">
             Aucun domaine ni région n’est annoté dans UniProtKB pour cette entrée.
           </p>
         ) : (
           <>
             {domains.some((d) => d.type === "transmembrane" || d.type === "intramembrane") && (
-              <div className="rounded-md border border-slate-200 p-3">
+              <div className="rounded-lg border border-slate-200 p-3">
                 <h3 className="mb-0.5 text-[15px] font-semibold text-slate-900">Topologie membranaire</h3>
                 <p className="mb-2 text-[13px] text-slate-500">
                   Passage de la chaîne à travers la bicouche lipidique d’après les annotations
@@ -157,7 +157,7 @@ export default function StructuralDomains({
               </div>
             )}
 
-            <div className="rounded-md border border-slate-200 p-3">
+            <div className="rounded-lg border border-slate-200 p-3">
               <h3 className="mb-0.5 text-[15px] font-semibold text-slate-900">Architecture des domaines</h3>
               <p className="mb-2 text-[13px] text-slate-500">
                 Organisation linéaire de la séquence (1 → {length}) : domaines, segments
@@ -166,7 +166,7 @@ export default function StructuralDomains({
               <DomainArchitecture regions={domains} length={length} activeRange={activeRange} onSelect={onFocusRange} />
             </div>
 
-            <details className="group rounded-md border border-slate-200">
+            <details className="group rounded-lg border border-slate-200">
               <summary className="cursor-pointer list-none px-3 py-2 text-[14px] font-semibold text-slate-800 hover:bg-slate-50">
                 <span className="mr-1 inline-block transition group-open:rotate-90">▸</span>
                 Tableau des annotations ({domains.length})
@@ -225,7 +225,7 @@ export default function StructuralDomains({
           </>
         )}
 
-        <div className="rounded-md border border-slate-200 p-3">
+        <div className="rounded-lg border border-slate-200 p-3">
           <h3 className="mb-0.5 text-[15px] font-semibold text-slate-900">Signatures InterPro, Pfam et PROSITE, sites et variants</h3>
           <p className="mb-2 text-[13px] text-slate-500">
             Domaines et familles reconnus par les bases membres d’InterPro, résidus catalytiques, sites de liaison et variants
@@ -234,7 +234,7 @@ export default function StructuralDomains({
           <InterProTracks accession={accession} length={length} activeRange={activeRange} onFocusRange={onFocusRange} />
         </div>
 
-        <div className="rounded-md border border-slate-200 p-3">
+        <div className="rounded-lg border border-slate-200 p-3">
           <div className="mb-2 flex items-center gap-2">
             <Search size={15} className="text-emerald-700" />
             <p className="text-[14px] font-semibold text-slate-900">
@@ -249,7 +249,7 @@ export default function StructuralDomains({
                 <button
                   key={`${motif.start}-${motif.end}-${motif.motif}-${index}`}
                   onClick={() => onFocusRange(motif)}
-                  className={`rounded-md border px-3 py-2 text-left text-[13px] transition ${
+                  className={`rounded-lg border px-3 py-2 text-left text-[13px] transition ${
                     isActive(motif)
                       ? "border-emerald-300 bg-emerald-50"
                       : "border-slate-200 bg-slate-50 hover:bg-emerald-50"
@@ -284,7 +284,7 @@ export default function StructuralDomains({
 function SectionTitle() {
   return (
     <div className="flex items-center gap-2.5">
-      <span className="rounded-md bg-violet-600 p-2 text-white shadow-sm">
+      <span className="rounded-lg bg-violet-600 p-2 text-white shadow-sm">
         <Dna size={16} />
       </span>
       <div>

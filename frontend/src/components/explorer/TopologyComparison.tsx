@@ -58,7 +58,7 @@ export default function TopologyComparison({
   const s = comparison.summary;
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white">
+    <section className="card">
       <div className="border-b border-slate-100 px-4 py-2.5">
         <h3 className="text-[16px] font-semibold text-slate-900">Comparaison des sources</h3>
         <p className="text-[13px] text-slate-500">
@@ -135,7 +135,7 @@ export default function TopologyComparison({
 
       <dl className="grid gap-2 border-t border-slate-100 px-4 py-3 text-[13px] sm:grid-cols-2 xl:grid-cols-4">
         {sources.map((source) => (
-          <div key={source.id} className="rounded-md bg-slate-50 px-3 py-2">
+          <div key={source.id} className="rounded-lg bg-slate-50 px-3 py-2">
             <dt className="font-semibold text-slate-800">
               {source.id === comparison.chosen ? "★ " : ""}
               {source.label}
@@ -149,7 +149,7 @@ export default function TopologyComparison({
           </div>
         ))}
         {!sources.some((x) => x.id === "deeptmhmm") && (
-          <div className="rounded-md bg-slate-50 px-3 py-2 text-slate-500">
+          <div className="rounded-lg bg-slate-50 px-3 py-2 text-slate-500">
             <dt className="font-semibold text-slate-800">DeepTMHMM</dt>
             <dd>
               {result.topology.deeptmhmm_status === "queued" || result.topology.deeptmhmm_status === "running"
@@ -161,7 +161,7 @@ export default function TopologyComparison({
           </div>
         )}
         {!sources.some((x) => x.id === "uniprot") && (
-          <div className="rounded-md bg-slate-50 px-3 py-2 text-slate-500">
+          <div className="rounded-lg bg-slate-50 px-3 py-2 text-slate-500">
             <dt className="font-semibold text-slate-800">UniProt</dt>
             <dd>Référence non reconnue dans UniProt : pas d’annotation à comparer.</dd>
           </div>

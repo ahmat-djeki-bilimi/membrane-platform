@@ -56,7 +56,7 @@ export default function AlignmentQuality({
 
   if (!quality || !preview) {
     return (
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <section className="card p-4">
         <h3 className="text-[16px] font-semibold text-slate-900">Contrôle qualité de l’alignement</h3>
         <p className="mt-1 text-[14px] text-slate-600">
           Cette analyse a été calculée avant l’ajout du contrôle qualité : recalculez-la (bandeau en haut de la page) pour
@@ -85,7 +85,7 @@ export default function AlignmentQuality({
   const set = (patch: Partial<QualityForm>) => setForm((f) => ({ ...f, ...patch }));
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white">
+    <section className="card">
       <div className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
         <div>
           <h3 className="text-[16px] font-semibold text-slate-900">Contrôle qualité de l’alignement</h3>
@@ -107,7 +107,7 @@ export default function AlignmentQuality({
           )}
           <button
             onClick={() => downloadText(`${fileBase}_colonnes_residus.csv`, mappingCsv(result, quality))}
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-2.5 py-1 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-2.5 py-1 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
           >
             <Download size={13} />
             Colonnes ↔ résidus (CSV)
@@ -172,7 +172,7 @@ export default function AlignmentQuality({
           )}
         </div>
 
-        <div className="rounded-md border border-slate-200 p-3">
+        <div className="rounded-lg border border-slate-200 p-3">
           <p className="text-[13px] font-semibold text-slate-700">Filtres avant le calcul</p>
           <div className="mt-2 space-y-2 text-[13px] text-slate-700">
             <NumberRow label="Écarter les séquences couvrant moins de" value={form.minCoverage} suffix="% de la référence" max={100} onChange={(v) => set({ minCoverage: v })} />
@@ -192,10 +192,10 @@ export default function AlignmentQuality({
             <p className="mt-2 text-[13px] text-rose-700">Réglages trop stricts : il faut garder au moins une séquence et 20 % des colonnes.</p>
           )}
           <div className="mt-3 flex flex-wrap gap-2">
-            <button onClick={() => setForm(SUGGESTED_FORM)} className="rounded-md border border-slate-300 px-2.5 py-1 text-[13px] font-semibold text-slate-700 hover:bg-slate-50">
+            <button onClick={() => setForm(SUGGESTED_FORM)} className="rounded-xl border border-slate-300 px-2.5 py-1 text-[13px] font-semibold text-slate-700 hover:bg-slate-50">
               Réglages proposés
             </button>
-            <button onClick={() => setForm(EMPTY_FORM)} className="rounded-md border border-slate-300 px-2.5 py-1 text-[13px] font-semibold text-slate-700 hover:bg-slate-50">
+            <button onClick={() => setForm(EMPTY_FORM)} className="rounded-xl border border-slate-300 px-2.5 py-1 text-[13px] font-semibold text-slate-700 hover:bg-slate-50">
               Aucun filtre
             </button>
             {onApply && (
@@ -203,7 +203,7 @@ export default function AlignmentQuality({
                 onClick={apply}
                 disabled={!changed || tooStrict || applying}
                 title={changed ? undefined : "Réglages identiques à ceux de l’analyse affichée"}
-                className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-[#0f4c81] px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-[#0c3d68] disabled:cursor-not-allowed disabled:opacity-40"
+                className="btn-primary ml-auto gap-1.5 px-3 py-1.5 text-[13px] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {applying ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
                 Recalculer conservation et coévolution
@@ -232,7 +232,7 @@ export default function AlignmentQuality({
 
 function Tile({ label, value, hint, title }: { label: string; value: string; hint: string; title?: string }) {
   return (
-    <div className="rounded-md bg-slate-50 px-3 py-2" title={title}>
+    <div className="rounded-lg bg-slate-50 px-3 py-2" title={title}>
       <dt className="text-slate-500">{label}</dt>
       <dd className="text-[17px] font-semibold tabular-nums text-slate-900">{value}</dd>
       <dd className="text-[12px] text-slate-500">{hint}</dd>
@@ -264,7 +264,7 @@ function NumberRow({
         value={value ?? ""}
         disabled={value == null}
         onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
-        className="w-16 rounded-md border border-slate-300 px-1.5 py-0.5 text-right tabular-nums outline-none focus:border-blue-500 disabled:bg-slate-100"
+        className="w-16 rounded-xl border border-slate-300 px-1.5 py-0.5 text-right tabular-nums outline-none focus:border-blue-500 disabled:bg-slate-100"
       />
       {suffix}
     </label>

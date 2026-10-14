@@ -46,7 +46,7 @@ export default function HydropathyChart({
 
   if (!profile.length) {
     return (
-      <p className="rounded-md border border-dashed border-slate-300 p-4 text-center text-[14px] text-slate-500">
+      <p className="rounded-lg border border-dashed border-slate-300 p-4 text-center text-[14px] text-slate-500">
         Séquence plus courte que la fenêtre ({windowSize} résidus) : profil non calculable.
       </p>
     );
@@ -68,7 +68,7 @@ export default function HydropathyChart({
 
   return (
     <div className="relative">
-      <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
+      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
         <svg
           ref={svgRef}
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
@@ -156,7 +156,7 @@ export default function HydropathyChart({
 
       {hover && (
         <div
-          className="pointer-events-none absolute top-1 z-10 -translate-x-1/2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[13px] shadow-md"
+          className="pointer-events-none absolute top-1 z-10 -translate-x-1/2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[13px] shadow-md"
           style={{ left: `clamp(60px, ${hoverLeftPct}%, calc(100% - 60px))` }}
         >
           <p className="font-semibold text-slate-900">

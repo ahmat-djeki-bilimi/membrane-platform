@@ -64,12 +64,12 @@ function CompareRuns() {
   }, [a, b]);
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#eef2f6] text-slate-900">
+    <div className="flex min-h-screen flex-col app-bg text-slate-900">
       <SiteHeader active="analyses" />
       <section className={HERO_BG}>
         <div aria-hidden className={HERO_GLOW} />
         <div className="relative w-full px-4 py-5 lg:px-6">
-          <nav className="flex items-center gap-1 text-[13px] text-blue-200">
+          <nav className="flex items-center gap-1 text-[13px] text-indigo-200">
             <Link href="/analyses" className="hover:text-white">
               Analyses
             </Link>
@@ -97,7 +97,7 @@ function CompareRuns() {
               {(["a", "b"] as const).map((side) => {
                 const run = data[side];
                 return (
-                  <Link key={side} href={`/analyses/${run.id}`} className="rounded-lg border border-slate-200 bg-white p-3 hover:border-[#0f4c81]">
+                  <Link key={side} href={`/analyses/${run.id}`} className="card card-hover p-3">
                     <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-slate-500">Exécution {side.toUpperCase()}</p>
                     <p className="font-semibold text-slate-900">{run.label}</p>
                     <p className="mt-1 flex flex-wrap items-center gap-2 text-[13px] text-slate-600">

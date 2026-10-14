@@ -64,7 +64,7 @@ export default function CoevolutionTab({
   const current = METHODS.find((m) => m.value === method)!;
   return (
     <div className="space-y-4">
-      <section className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+      <section className="card px-4 py-3">
         <div className="flex flex-wrap items-center gap-3">
           <SegmentedControl label="Méthode" value={method} onChange={setMethod} options={METHODS.map(({ value, label }) => ({ value, label }))} />
           <span className="text-[13px] text-slate-500">{current.text}</span>
@@ -137,7 +137,7 @@ function MipView({
 
   if (!coevolution) {
     return (
-      <p className="rounded-lg border border-slate-200 bg-white p-4 text-[14px] text-slate-600">
+      <p className="card p-4 text-[14px] text-slate-600">
         La coévolution n’a pas été calculée (séquence de référence de plus de 1 500 résidus ou alignement trop petit).
       </p>
     );
@@ -169,7 +169,7 @@ function MipView({
         <StatCard tone="cyan" icon={<NetworkIcon size={15} />} label="Réseaux" value={`${result.networks.length}`} hint={`à partir de ${coevolution.strong_pairs} paires fortes (z ≥ 3)`} />
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-[13px]">
+      <div className="flex flex-wrap items-center gap-3 card px-4 py-2.5 text-[13px]">
         <span className="font-semibold text-slate-800">Paires affichées</span>
         <SegmentedControl
           label="Nombre de paires"
@@ -184,7 +184,7 @@ function MipView({
         <span className="text-slate-500">L = longueur de la référence ; les premières paires sont les plus sûres.</span>
         <button
           onClick={() => downloadText(`${fileBase}_coevolution.csv`, pairsCsv(coevolution.pairs), "text/csv")}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-white px-3 py-1.5 font-semibold text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50"
+          className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 font-semibold text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50"
         >
           <Download size={13} />
           Toutes les paires (CSV)
@@ -192,7 +192,7 @@ function MipView({
       </div>
 
       <div className={`grid gap-4 ${result.structure ? "xl:grid-cols-2" : ""}`}>
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
+        <section className="card p-4">
           <h3 className="text-[16px] font-semibold text-slate-900">Carte de contacts</h3>
           <p className="mb-2 text-[13px] text-slate-500">
             En haut à droite : paires qui coévoluent{result.structure ? " (vert : en contact dans le modèle, orange : éloignées)" : ""}.
@@ -202,7 +202,7 @@ function MipView({
         </section>
 
         {result.structure && (
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <section className="card p-4">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-[16px] font-semibold text-slate-900">Coévolution dans la structure</h3>
               <SegmentedControl
@@ -238,7 +238,7 @@ function MipView({
       </div>
 
       {result.networks.length > 0 && (
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
+        <section className="card p-4">
           <h3 className="text-[16px] font-semibold text-slate-900">Réseaux de résidus couplés</h3>
           <p className="mb-3 text-[13px] text-slate-500">
             Groupes de positions reliées par des paires fortes : candidats pour des interactions entre hélices, la stabilité
@@ -255,7 +255,7 @@ function MipView({
                     setView("networks");
                     setNetwork(active ? null : n.id);
                   }}
-                  className={`rounded-md border p-3 text-left ${active ? "border-slate-800 bg-slate-50" : "border-slate-200 hover:bg-slate-50"}`}
+                  className={`rounded-lg border p-3 text-left ${active ? "border-slate-800 bg-slate-50" : "border-slate-200 hover:bg-slate-50"}`}
                 >
                   <p className="flex items-center gap-2 text-[14px] font-semibold text-slate-900">
                     <span className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
@@ -277,7 +277,7 @@ function MipView({
 
       <MipControls coevolution={coevolution} />
 
-      <section className="rounded-lg border border-slate-200 bg-white">
+      <section className="card">
         <h3 className="border-b border-slate-100 px-4 py-2.5 text-[16px] font-semibold text-slate-900">Paires de positions ({pairs.length})</h3>
         <div className="max-h-[420px] overflow-auto">
           <table className="w-full text-[13px]">

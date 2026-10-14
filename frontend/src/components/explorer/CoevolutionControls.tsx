@@ -23,7 +23,7 @@ function Badge({ status }: { status: CheckStatus }) {
 
 function Panel({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4">
+    <section className="card p-4">
       <h3 className="text-[16px] font-semibold text-slate-900">{title}</h3>
       {subtitle && <p className="mb-2 text-[13px] text-slate-500">{subtitle}</p>}
       {children}
@@ -54,7 +54,7 @@ export function AlignmentChecks({ diagnostics }: { diagnostics?: CoevolutionDiag
     >
       <ul className="grid gap-2 md:grid-cols-2">
         {diagnostics.checks.map((c) => (
-          <li key={c.id} className="rounded-md border border-slate-200 p-3 text-[13px]">
+          <li key={c.id} className="rounded-lg border border-slate-200 p-3 text-[13px]">
             <p className="flex flex-wrap items-center gap-2">
               <b className="text-slate-900">{c.label}</b>
               <Badge status={c.status} />
@@ -121,7 +121,7 @@ export function MipControls({ coevolution }: { coevolution: Coevolution }) {
         >
           {!robustness.skipped && (
             <div className="grid gap-3 text-[13px] md:grid-cols-2">
-              <div className="rounded-md bg-slate-50 p-3">
+              <div className="rounded-lg bg-slate-50 p-3">
                 <p className="font-semibold text-slate-900">Sous-échantillonnage ({robustness.subsamples} × {pct(robustness.fraction)} des séquences)</p>
                 <p className="mt-1 text-slate-700">
                   En moyenne <b>{pct(robustness.mean_overlap)}</b> des paires retrouvées parmi les L/5 premières (répétitions :{" "}
@@ -130,7 +130,7 @@ export function MipControls({ coevolution }: { coevolution: Coevolution }) {
                 </p>
                 <p className="mt-1 text-slate-500">Une paire instable dépend de quelques séquences : à ne pas surinterpréter.</p>
               </div>
-              <div className="rounded-md bg-slate-50 p-3">
+              <div className="rounded-lg bg-slate-50 p-3">
                 <p className="font-semibold text-slate-900">Hypothèse nulle ({robustness.shuffles} alignement(s) mélangé(s))</p>
                 <p className="mt-1 text-slate-700">
                   Chaque colonne est mélangée entre les séquences : la conservation est gardée, la covariation détruite. Meilleur score

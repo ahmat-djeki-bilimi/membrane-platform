@@ -65,7 +65,7 @@ export default function InterProTracks({
 
   return (
     <div className="space-y-3">
-      {!data.interpro.available && <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-900">{data.interpro.error}</p>}
+      {!data.interpro.available && <p className="rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-900">{data.interpro.error}</p>}
       <svg viewBox={`0 0 ${W} ${height}`} className="w-full" role="img" aria-label="Signatures InterPro, sites et variants le long de la séquence" onMouseLeave={() => setHover(null)}>
         {shownRows.map(([label, entries], r) => {
           const y = r * ROW + 4;
@@ -190,7 +190,7 @@ export default function InterProTracks({
       </div>
 
       {data.interpro.entries.length > 0 && (
-        <details className="rounded-md border border-slate-200">
+        <details className="rounded-lg border border-slate-200">
           <summary className="cursor-pointer px-3 py-2 text-[14px] font-semibold text-slate-800 hover:bg-slate-50">Tableau des signatures ({data.interpro.entries.length})</summary>
           <div className="max-h-[300px] overflow-auto border-t border-slate-200">
             <table className="w-full text-[13px]">

@@ -13,11 +13,11 @@ export default function ConservationSummary({ accession }: { accession: string }
   const { status, result, error } = useConservation(accession);
 
   return (
-    <section className="relative overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <section className="relative overflow-hidden card">
       <span className="absolute inset-x-0 top-0 h-1 bg-violet-600" />
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 pb-2.5 pt-3.5">
         <div className="flex items-center gap-2.5">
-          <span className="rounded-md bg-violet-600 p-2 text-white shadow-sm">
+          <span className="rounded-lg bg-violet-600 p-2 text-white shadow-sm">
             <GitBranch size={16} />
           </span>
           <div>
@@ -27,7 +27,7 @@ export default function ConservationSummary({ accession }: { accession: string }
         </div>
         <Link
           href={`/structures/${accession}?tab=evolution`}
-          className="inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[14px] font-semibold text-white hover:bg-violet-700"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-[14px] font-semibold text-white hover:bg-violet-700"
         >
           Analyse complète (3D, alignement)
           <ArrowRight size={15} />

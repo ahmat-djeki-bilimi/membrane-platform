@@ -52,7 +52,7 @@ export default function ConservationTab({
     <div className="space-y-4">
       <AlignmentQuality result={result} applied={quality} selected={selected} onSelect={onSelect} onApply={onApplyQuality} fileBase={fileBase} />
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <section className="card p-4">
         <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
           <h3 className="text-[16px] font-semibold text-slate-900">Conservation résidu par résidu</h3>
           <p className="text-[13px] text-slate-500">
@@ -79,7 +79,7 @@ export default function ConservationTab({
       </section>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
+        <section className="card p-4">
           <h3 className="text-[16px] font-semibold text-slate-900">Positions conservées et variables</h3>
           <p className="mb-2 text-[13px] text-slate-500">Cliquez une position pour la suivre dans tous les onglets.</p>
           <p className="mb-1 text-[13px] font-semibold text-[#a02560]">Les plus conservées</p>
@@ -102,7 +102,7 @@ export default function ConservationTab({
           </p>
         </section>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
+        <section className="card p-4">
           <h3 className="text-[16px] font-semibold text-slate-900">Conservation par région</h3>
           <p className="mb-2 text-[13px] text-slate-500">Hélices transmembranaires, boucles et extrémités.</p>
           {regions.length === 0 ? (
@@ -133,7 +133,7 @@ export default function ConservationTab({
         </section>
       </div>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <section className="card p-4">
         <h3 className="text-[16px] font-semibold text-slate-900">Alignement multiple</h3>
         <p className="mb-3 text-[13px] text-slate-500">
           Ancré sur la référence : les résidus identiques à la référence prennent la couleur de conservation de la colonne.

@@ -137,7 +137,7 @@ export default function ExplorerViewer({
   }, [spin, ready]);
 
   return (
-    <div className="overflow-hidden rounded-md border border-slate-200 bg-white">
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2 text-[13px]">
         {hasMembrane && (
           <label className="flex items-center gap-1 text-slate-700">
@@ -148,7 +148,7 @@ export default function ExplorerViewer({
         <div className="ml-auto flex gap-1.5">
           <button
             onClick={() => setSpin((v) => !v)}
-            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 font-semibold ${
+            className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 font-semibold ${
               spin ? "bg-slate-800 text-white" : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
             }`}
           >
@@ -160,7 +160,7 @@ export default function ExplorerViewer({
               viewerRef.current?.zoomTo({ hetflag: false });
               viewerRef.current?.render();
             }}
-            className="rounded-md bg-white px-2 py-1 font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+            className="rounded-lg bg-white px-2 py-1 font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
           >
             Recentrer
           </button>

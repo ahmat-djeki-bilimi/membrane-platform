@@ -97,10 +97,10 @@ export default function ComparisonPanel({
   const c = state.result;
 
   return (
-    <section id="superposition" className="scroll-mt-16 space-y-4 rounded-lg border border-slate-200 bg-white p-4">
+    <section id="superposition" className="scroll-mt-16 space-y-4 card p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <span className="rounded-md bg-violet-600 p-2 text-white shadow-sm">
+          <span className="rounded-lg bg-violet-600 p-2 text-white shadow-sm">
             <GitCompare size={16} />
           </span>
           <div>
@@ -114,7 +114,7 @@ export default function ComparisonPanel({
         {models.length > 1 && (
         <div className="flex items-center gap-2 text-[14px] text-slate-700">
           Modèle comparé
-          <div className="inline-flex rounded-md bg-slate-100 p-0.5 text-[13px]" role="radiogroup" aria-label="Modèle comparé">
+          <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-[13px]" role="radiogroup" aria-label="Modèle comparé">
             {models.map((key) => {
               const enabled = key === "esmfold" ? !!esmfold : alphafoldAvailable;
               return (
@@ -268,7 +268,7 @@ function CrystalContents({ comparison }: { comparison: ComparisonResult }) {
   const chains = showAll ? comparison.other_chains : comparison.other_chains.slice(0, COLLAPSED_CHAINS);
   const hidden = comparison.other_chains.length - chains.length;
   return (
-    <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] text-slate-700">
+    <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] text-slate-700">
       <p className="mb-1 font-semibold text-slate-900">
         Contenu du cristal {comparison.pdb_id} · {comparison.other_chains.length + 1} chaînes
         {comparison.file_format === "mmCIF" && <span className="ml-1 font-normal text-slate-500">(fichier mmCIF)</span>}
@@ -305,7 +305,7 @@ function CrystalContents({ comparison }: { comparison: ComparisonResult }) {
 
 function Stat({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
       <p className="text-[12px] font-medium uppercase tracking-[0.08em] text-slate-500">{label}</p>
       <p className="text-[22px] font-bold text-slate-900">{value}</p>
       <p className="truncate text-[13px] text-slate-500" title={hint}>
@@ -330,7 +330,7 @@ function Notes({ notes }: { notes: ComparisonResult["interpretation"] }) {
         {notes.map((note, i) => {
           const style = NOTE_STYLE[note.level] ?? NOTE_STYLE.info;
           return (
-            <li key={`${i}-${note.title}`} className={`flex gap-2.5 rounded-md border px-3 py-2 ${style.className}`}>
+            <li key={`${i}-${note.title}`} className={`flex gap-2.5 rounded-lg border px-3 py-2 ${style.className}`}>
               <span className={`mt-0.5 shrink-0 ${style.iconClass}`}>{style.icon}</span>
               <div>
                 <p className="text-[14px] font-semibold text-slate-900">{note.title}</p>
@@ -471,7 +471,7 @@ function DeviationProfile({
         </svg>
         {hover != null && (
           <div
-            className="pointer-events-none absolute top-0 z-10 rounded-md bg-slate-900 px-2.5 py-1.5 text-[12px] text-white shadow-lg"
+            className="pointer-events-none absolute top-0 z-10 rounded-lg bg-slate-900 px-2.5 py-1.5 text-[12px] text-white shadow-lg"
             style={{ left: `${Math.min(80, Math.max(2, ((x(hover) + step / 2) / W) * 100))}%` }}
           >
             <p className="font-semibold">
@@ -516,7 +516,7 @@ function RegionTable({
     <div>
       <h3 className="text-[16px] font-semibold text-slate-900">Écart par région</h3>
       <p className="mb-2 text-[13px] text-slate-500">Hélices, boucles et extrémités du modèle ; cliquez une ligne pour la voir en 3D.</p>
-      <div className="max-h-[360px] overflow-auto rounded-md border border-slate-200">
+      <div className="max-h-[360px] overflow-auto rounded-lg border border-slate-200">
         <table className="w-full text-[14px]">
           <thead className="sticky top-0 bg-slate-50 text-[13px] text-slate-600">
             <tr>
@@ -580,7 +580,7 @@ function HelixTiltTable({
     <div>
       <h3 className="text-[16px] font-semibold text-slate-900">Inclinaison des hélices</h3>
       <p className="mb-2 text-[13px] text-slate-500">Angle avec la normale à la membrane, dans le modèle et dans le cristal superposé.</p>
-      <div className="overflow-auto rounded-md border border-slate-200">
+      <div className="overflow-auto rounded-lg border border-slate-200">
         <table className="w-full text-[14px]">
           <thead className="bg-slate-50 text-[13px] text-slate-600">
             <tr>
@@ -638,7 +638,7 @@ function LigandSites({
       </p>
       <ul className="space-y-2">
         {shown.map((site) => (
-          <li key={`${site.ligand}-${site.number}`} className="rounded-md border border-slate-200 px-3 py-2">
+          <li key={`${site.ligand}-${site.number}`} className="rounded-lg border border-slate-200 px-3 py-2">
             <p className="text-[14px] font-semibold text-slate-900">
               {site.ligand} {site.number}
               <span className="ml-2 text-[13px] font-normal text-slate-500">

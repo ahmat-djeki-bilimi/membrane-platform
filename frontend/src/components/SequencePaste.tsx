@@ -56,11 +56,11 @@ export default function SequencePaste({ id }: { id?: string }) {
   };
 
   return (
-    <section id={id} className="relative scroll-mt-16 overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <section id={id} className="relative scroll-mt-16 overflow-hidden card">
       <span className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-rose-500 via-violet-500 to-blue-600" />
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 pb-2.5 pt-3.5">
         <div className="flex items-center gap-2.5">
-          <span className="rounded-md bg-rose-500 p-2 text-white shadow-sm">
+          <span className="rounded-lg bg-rose-500 p-2 text-white shadow-sm">
             <ClipboardPaste size={16} />
           </span>
           <div>
@@ -77,14 +77,14 @@ export default function SequencePaste({ id }: { id?: string }) {
               setText(EXAMPLE_FASTA);
               setSubmitError(null);
             }}
-            className="rounded-md border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
+            className="rounded-lg border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
           >
             Exemple (bactériorhodopsine)
           </button>
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
           >
             <FileUp size={13} />
             Importer un fichier
@@ -134,7 +134,7 @@ export default function SequencePaste({ id }: { id?: string }) {
             }
             rows={7}
             spellCheck={false}
-            className={`w-full resize-y rounded-md border bg-slate-50 px-3 py-2 font-mono text-[14px] leading-5 text-slate-900 outline-none transition placeholder:font-sans placeholder:text-slate-400 focus:bg-white focus:ring-2 ${
+            className={`w-full resize-y rounded-lg border bg-slate-50 px-3 py-2 font-mono text-[14px] leading-5 text-slate-900 outline-none transition placeholder:font-sans placeholder:text-slate-400 focus:bg-white focus:ring-2 ${
               dragging
                 ? "border-rose-400 bg-rose-50 ring-2 ring-rose-100"
                 : parsed && !parsed.ok
@@ -188,7 +188,7 @@ export default function SequencePaste({ id }: { id?: string }) {
           <button
             type="submit"
             disabled={!parsed || !parsed.ok}
-            className="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-rose-500 to-violet-600 px-4 py-2 text-[15px] font-semibold text-white shadow-sm transition hover:from-rose-400 hover:to-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-rose-500 to-violet-600 px-4 py-2 text-[15px] font-semibold text-white shadow-sm transition hover:from-rose-400 hover:to-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Analyser la séquence
             <ArrowRight size={15} />

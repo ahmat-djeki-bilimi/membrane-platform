@@ -57,12 +57,12 @@ export default function RunPage() {
   const provenance = run?.provenance;
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#eef2f6] text-slate-900">
+    <div className="flex min-h-screen flex-col app-bg text-slate-900">
       <SiteHeader active="analyses" />
       <section className={HERO_BG}>
         <div aria-hidden className={HERO_GLOW} />
         <div className="relative w-full px-4 py-5 lg:px-6">
-          <nav className="flex items-center gap-1 text-[13px] text-blue-200">
+          <nav className="flex items-center gap-1 text-[13px] text-indigo-200">
             <Link href="/" className="hover:text-white">
               Accueil
             </Link>
@@ -77,7 +77,7 @@ export default function RunPage() {
             <div>
               <h1 className="text-[24px] font-bold text-white">{run?.label ?? "Exécution"}</h1>
               {run && (
-                <p className="mt-1 flex flex-wrap items-center gap-2 text-[14px] text-blue-100">
+                <p className="mt-1 flex flex-wrap items-center gap-2 text-[14px] text-indigo-100">
                   <StatusBadge status={run.status} stale={run.stale} />
                   <span>créée le {formatDate(run.created_at)}</span>
                   {run.finished_at && <span>· terminée le {formatDate(run.finished_at)}</span>}
@@ -89,12 +89,12 @@ export default function RunPage() {
             {run && (
               <div className="flex flex-wrap gap-2">
                 {result && run.status === "succeeded" && (
-                  <Link href={result} className="inline-flex items-center gap-1.5 rounded-md bg-white px-3 py-2 text-[14px] font-semibold text-[#0f4c81] hover:bg-blue-50">
+                  <Link href={result} className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-[14px] font-semibold text-indigo-700 hover:bg-blue-50">
                     Voir le résultat <ArrowRight size={14} />
                   </Link>
                 )}
                 {run.can_resume && (
-                  <button onClick={() => act("resume")} disabled={busy !== null} className="inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-100 px-3 py-2 text-[14px] font-semibold text-amber-900 hover:bg-amber-50">
+                  <button onClick={() => act("resume")} disabled={busy !== null} className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-100 px-3 py-2 text-[14px] font-semibold text-amber-900 hover:bg-amber-50">
                     {busy === "resume" ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
                     Reprendre l’analyse
                   </button>
@@ -103,13 +103,13 @@ export default function RunPage() {
                   onClick={() => act("rerun")}
                   disabled={busy !== null || !!active}
                   title="Relance le calcul avec les mêmes paramètres, pour comparer deux exécutions"
-                  className="inline-flex items-center gap-1.5 rounded-md border border-white/25 bg-white/10 px-3 py-2 text-[14px] font-medium text-white hover:bg-white/20 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/25 bg-white/10 px-3 py-2 text-[14px] font-medium text-white hover:bg-white/20 disabled:opacity-50"
                 >
                   {busy === "rerun" ? <Loader2 size={14} className="animate-spin" /> : <Copy size={14} />}
                   Nouvelle exécution
                 </button>
                 {run.parent_id && (
-                  <Link href={`/analyses/comparer?a=${run.parent_id}&b=${run.id}`} className="inline-flex items-center gap-1.5 rounded-md border border-white/25 bg-white/10 px-3 py-2 text-[14px] font-medium text-white hover:bg-white/20">
+                  <Link href={`/analyses/comparer?a=${run.parent_id}&b=${run.id}`} className="inline-flex items-center gap-1.5 rounded-lg border border-white/25 bg-white/10 px-3 py-2 text-[14px] font-medium text-white hover:bg-white/20">
                     <GitCompare size={14} />
                     Comparer à l’exécution d’origine
                   </Link>
@@ -208,7 +208,7 @@ export default function RunPage() {
               <Section title="Tentatives précédentes" subtitle="Chaque reprise garde la trace de la tentative interrompue ou en échec.">
                 <ul className="space-y-2 text-[13px]">
                   {run.history.map((attempt) => (
-                    <li key={attempt.attempt} className="rounded-md border border-slate-200 p-2">
+                    <li key={attempt.attempt} className="rounded-lg border border-slate-200 p-2">
                       <p className="flex flex-wrap items-center gap-2">
                         <b>Tentative {attempt.attempt}</b> <StatusBadge status={attempt.status} />
                         <span className="text-slate-500">
