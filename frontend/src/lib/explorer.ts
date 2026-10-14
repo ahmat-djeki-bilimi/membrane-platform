@@ -1,7 +1,7 @@
 // Membrane Evolution & Function Explorer (route /api/explorer, calcul en file).
 
 import { API_BASE } from "./api";
-import type { ConservationResult, ConservedPosition, Homolog, PhyloTree, TreeModel } from "./conservation";
+import type { ConservationResult, ConservedPosition, Homolog, PhyloTree, TreeModel, TreeSelection, TreeStrategy } from "./conservation";
 import { readJob, useJob, type Job, type JobState } from "./jobs";
 import type { PredictedHelix, TopologySource } from "./prediction";
 
@@ -404,14 +404,50 @@ export const MAX_TREE_SELECTION = 200;
 
 export type TreeJobResult = { parent: string; ids: string[]; missing: number; tree: PhyloTree | null };
 
-/** Arbre de la référence et des homologues choisis (calcul en file, à partir de l'alignement de l'analyse). */
-export async function submitTree(jobId: string, ids: string[], model: TreeModel): Promise<Job<TreeJobResult>> {
+export type TreeRequest = {
+  strategy: TreeStrategy;
+  count: number;
+  ids?: string[];
+  method: "nj" | "ml";
+  model: TreeModel;
+  ml_model: "LG+G4" | "MFP";
+  replicates: 100 | 200 | 500;
+};
+
+/** Arbre selon une stratégie de sélection, par Neighbor-Joining ou IQ-TREE (calcul en file). */
+export async function submitTree(jobId: string, request: TreeRequest): Promise<Job<TreeJobResult>> {
   const response = await fetch(`${API_BASE}/api/explorer/${encodeURIComponent(jobId)}/tree`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ids, model }),
+    body: JSON.stringify(request),
   });
   return readJob(response);
+}
+
+/** Homologues que retiendrait une stratégie (aperçu avant de construire l'arbre). */
+export async function fetchTreeSelection(jobId: string, strategy: Exclude<TreeStrategy, "custom">, count: number): Promise<TreeSelection> {
+  const response = await fetch(`${API_BASE}/api/explorer/${encodeURIComponent(jobId)}/tree/selection?strategy=${strategy}&count=${count}`);
+  const data = await response.json();
+  if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : `Erreur ${response.status}`);
+  return data;
+}
+
+export type PhylogenyTools = {
+  nj: { available: true; replicates: number[] };
+  ml: {
+    available: boolean;
+    version: string | null;
+    models: Record<"LG+G4" | "MFP", { label: string; text: string }>;
+    ufboot_replicates: number;
+    alrt_replicates: number;
+    help: string | null;
+  };
+  strategies: Record<TreeStrategy, { label: string; text: string }>;
+};
+
+export async function fetchPhylogenyTools(): Promise<PhylogenyTools> {
+  const response = await fetch(`${API_BASE}/api/explorer/phylogeny-tools`);
+  return response.json();
 }
 
 /** Suit un arbre choisi par l'identifiant de sa tâche (gardé dans l'adresse de la page). */

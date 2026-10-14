@@ -95,6 +95,33 @@ export type PhyloLeaf = {
 
 export type TreeModel = "kimura" | "poisson" | "p";
 
+export type TreeLevel = "correcte" | "prudence" | "insuffisante";
+export type CheckState = "ok" | "attention" | "probleme";
+export type TreeStrategy = "closest" | "taxonomic" | "diversity" | "custom";
+
+/** Stratégie de choix des séquences d'un arbre et son résultat. */
+export type TreeSelection = {
+  strategy: TreeStrategy;
+  label: string;
+  text: string;
+  requested: number;
+  ids?: string[];
+  available: number;
+  species: number;
+  identity_range: [number, number] | null;
+  details: {
+    rank?: string;
+    rank_label?: string;
+    groups_available?: number;
+    groups_covered?: number;
+    min_coverage?: number | null;
+    excluded_low_coverage?: number;
+    mean_nearest_distance?: number | null;
+    last_nearest_distance?: number | null;
+    requested?: number;
+  };
+};
+
 export type PhyloTree = {
   method: string;
   /** Méthode de reconstruction, modèle de distance, racine et support (analyses récentes). */
@@ -115,6 +142,28 @@ export type PhyloTree = {
   };
   reliability?: "correcte" | "prudence" | "insuffisante";
   limits?: string[];
+  /** nj : Neighbor-Joining ; ml : maximum de vraisemblance (IQ-TREE). */
+  method_id?: "nj" | "ml";
+  ml?: { version: string; model: string; requested_model: string; log_likelihood: number | null; runtime: number; command: string } | null;
+  selection?: TreeSelection | null;
+  /** Qualité des données (indépendante de la méthode). */
+  data_quality?: { level: TreeLevel; status: CheckState; checks: { id: string; label: string; value: string; status: CheckState; text: string }[]; limits: string[] };
+  /** Robustesse phylogénétique (support des branches). */
+  robustness?: {
+    level: TreeLevel;
+    status: CheckState;
+    measure: string;
+    replicates: number;
+    internal_branches: number;
+    supported_70: number;
+    fraction_70: number | null;
+    recommended: { label: string; bootstrap?: number; ufboot?: number; alrt?: number };
+    robust: number;
+    fraction_recommended: number | null;
+    mean_support: number | null;
+    histogram: { label: string; count: number }[];
+    limits: string[];
+  };
   bootstrap_replicates: number;
   leaf_count: number;
   max_distance: number;

@@ -6,6 +6,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# IQ-TREE : arbres phylogénétiques par maximum de vraisemblance (paquet Debian, binaire iqtree2)
+RUN apt-get update && apt-get install -y --no-install-recommends iqtree && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt requirements-prod.txt ./
 RUN pip install -r requirements-prod.txt
 

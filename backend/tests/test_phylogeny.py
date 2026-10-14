@@ -155,12 +155,25 @@ def test_informative_sites():
     assert ps.informative_sites(["AA", "AA", "AC", "CA"]) == 0
 
 
-def test_interpretation_limits():
-    good = {"informative_sites": 200, "saturated_fraction": 0, "mean_overlap": 0.95, "strong_fraction": 0.8, "median_identity": 0.5}
-    assert ps.interpretation_limits(30, 100, good) == ("correcte", [])
-    level, limits = ps.interpretation_limits(5, 100, {**good, "informative_sites": 10, "strong_fraction": 0.05})
-    assert level == "insuffisante" and len(limits) == 3
-    assert ps.interpretation_limits(30, 100, {**good, "median_identity": 0.95})[0] == "prudence"
+def test_data_quality_and_robustness_are_separate():
+    good = {"informative_sites": 200, "columns": 300, "saturated_fraction": 0, "mean_overlap": 0.95, "median_identity": 0.5}
+    quality = ps.data_quality(30, good, groups=4, identity_range=[0.3, 0.8])
+    assert quality["level"] == "correcte" and quality["limits"] == []
+    weak = ps.data_quality(5, {**good, "informative_sites": 10}, groups=1)
+    assert weak["level"] == "insuffisante"
+    assert {c["id"] for c in weak["checks"] if c["status"] != "ok"} == {"sequences", "informative"}
+    assert ps.data_quality(30, {**good, "median_identity": 0.95})["level"] == "prudence"
+
+    # Bootstrap (Neighbor-Joining) : seuil 70 %
+    supports = {1: 0.95, 2: 0.75, 4: 0.4, 8: 0.2}
+    nj = ps.robustness("nj", supports, None, 100, 4)
+    assert nj["supported_70"] == 2 and nj["fraction_70"] == 0.5 and nj["level"] == "correcte"
+    assert [b["count"] for b in nj["histogram"]] == [2, 0, 1, 1]
+    # UFBoot (IQ-TREE) : 70 % ne suffit pas, il faut UFBoot >= 95 et SH-aLRT >= 80
+    ml = ps.robustness("ml", supports, {1: 0.9, 2: 0.99, 4: 0.5, 8: 0.1}, 1000, 4)
+    assert ml["fraction_70"] == 0.5 and ml["robust"] == 1 and ml["fraction_recommended"] == 0.25
+    assert ml["level"] == "prudence" and "UFBoot" in ml["recommended"]["label"]
+    assert ps.robustness("nj", {}, None, 0, 0)["level"] == "insuffisante"
 
 
 def test_build_tree_reports_method_and_mask(monkeypatch):

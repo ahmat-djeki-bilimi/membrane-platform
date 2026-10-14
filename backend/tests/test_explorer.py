@@ -302,7 +302,7 @@ def test_explorer_tree_on_selection():
     client = TestClient(app)
     job = client.post("/api/explorer", json={"fasta": fasta(family(15))}).json()
     ids = [m["accession"] for m in client.get(f"/api/jobs/{job['id']}").json()["result"]["msa"]][:6]
-    assert client.post(f"/api/explorer/{job['id']}/tree", json={"ids": ids[:2]}).status_code == 422
+    assert client.post(f"/api/explorer/{job['id']}/tree", json={"ids": ids[:2]}).status_code == 400
     assert client.post(f"/api/explorer/{job['id']}/tree", json={"ids": ["x", "y", "z"]}).status_code == 400
     assert client.post("/api/explorer/inconnu/tree", json={"ids": ids}).status_code == 404
     response = client.post(f"/api/explorer/{job['id']}/tree", json={"ids": ids, "model": "p"})

@@ -26,7 +26,7 @@ KIND_LABELS = {
 }
 
 # Durée au-delà de laquelle une tâche « en cours » est probablement interrompue
-STALE_AFTER = {"deeptmhmm": timedelta(hours=3, minutes=30)}
+STALE_AFTER = {"deeptmhmm": timedelta(hours=3, minutes=30), "explorer_tree": timedelta(hours=3, minutes=30)}
 DEFAULT_STALE = timedelta(hours=1)
 
 _ALIGN = {"name": "Alignement semi-global (Gotoh, BLOSUM62, gaps 11/1)", "reference": "Gotoh 1982 ; Henikoff & Henikoff 1992"}
@@ -38,6 +38,7 @@ _DEEPTMHMM = {"name": "DeepTMHMM (BioLib)", "reference": "Hallgren et al. 2022"}
 _ESMFOLD = {"name": "ESMFold (API ESM Atlas)", "reference": "Lin et al. 2023"}
 _AF = {"name": "AlphaFold DB (modèles prédits)", "reference": "Jumper et al. 2021 ; Varadi et al. 2024"}
 _MEMBRANE = {"name": "Placement dans la membrane : ajustement d’une bicouche (inspiré de PPM et TMDET)", "reference": "Lomize et al. 2012 ; Tusnády et al. 2005"}
+_IQTREE = {"name": "Maximum de vraisemblance : IQ-TREE, UFBoot2 et SH-aLRT", "reference": "Minh et al. 2020 ; Hoang et al. 2018 ; Guindon et al. 2010"}
 _MMSEQS = {"name": "MMseqs2 (serveur ColabFold, UniRef)", "reference": "Steinegger & Söding 2017 ; Mirdita et al. 2022"}
 
 METHODS = {
@@ -60,6 +61,8 @@ def methods(kind: str, params: dict) -> list[dict]:
         selected = [m for m in selected if m is not _MMSEQS]
     if kind == "conservation" and params.get("source") != "mmseqs":
         selected = [m for m in selected if m is not _MMSEQS]
+    if kind == "explorer_tree" and params.get("method") == "ml":
+        selected = [_IQTREE]
     return [{**m, "platform_version": version} for m in selected]
 
 
