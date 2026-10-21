@@ -1,8 +1,17 @@
 # MemProtScope
 
-Plateforme d'analyse des protéines membranaires : annotation UniProt, topologie
-transmembranaire (DeepTMHMM), structures expérimentales (RCSB PDB) et prédites
-(AlphaFold), validation structurale, orientation dans la membrane (OPM).
+**Plateforme web d'analyse bioinformatique des protéines membranaires**, permettant d'explorer les relations entre leurs séquences, leurs structures tridimensionnelles et leurs propriétés fonctionnelles.
+
+MemProtScope intègre plusieurs approches complémentaires :
+
+- **Analyse des séquences** : récupération des informations depuis UniProt, recherche de séquences homologues, alignement multiple et filtrage.
+- **Conservation évolutive** : identification des positions conservées et variables.
+- **Analyse phylogénétique** : reconstruction d'arbres par la méthode Neighbor-Joining.
+- **Analyse de coévolution** : détection de paires de positions statistiquement associées par information mutuelle corrigée par APC (MIp) et identification de secteurs protéiques par SCA associée à ICA.
+- **Analyse structurale** : prédiction de la topologie membranaire avec DeepTMHMM, récupération des structures expérimentales depuis RCSB PDB et des structures prédites depuis AlphaFold DB.
+- **Visualisation 3D** : exploration des résidus conservés et des positions candidates issues des analyses de coévolution dans leur contexte structural, avec prise en compte de l'orientation membranaire.
+
+**Objectif :** réunir différentes méthodes bioinformatiques dans une interface interactive afin de faciliter l'exploration des relations entre séquence, structure et fonction des protéines membranaires.
 
 ## Architecture
 
