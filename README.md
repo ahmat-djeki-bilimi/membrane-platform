@@ -13,6 +13,36 @@ MemProtScope intègre plusieurs approches complémentaires :
 
 **Objectif :** réunir différentes méthodes bioinformatiques dans une interface interactive afin de faciliter l'exploration des relations entre séquence, structure et fonction des protéines membranaires.
 
+## Sources de données et outils
+
+### Bases de données
+
+| Source | Utilisation |
+|---|---|
+| **UniProt** | Séquences, annotations et caractéristiques des protéines |
+| **RCSB PDB** | Structures expérimentales |
+| **PDBe (SIFTS)** | Correspondance entre les positions UniProt et les structures PDB |
+| **AlphaFold DB** | Structures prédites |
+| **OPM** | Orientation des protéines dans la membrane |
+| **InterPro et Pfam** | Domaines et familles de protéines |
+| **Gene Ontology (QuickGO)** | Annotations fonctionnelles et codes de preuve |
+| **TCDB** | Classification des transporteurs |
+| **PubMed** | Références bibliographiques |
+
+### Outils et méthodes
+
+| Outil / méthode | Utilisation |
+|---|---|
+| **MMseqs2** (serveur ColabFold, base UniRef) | Recherche d'homologues et alignement multiple |
+| **Divergence de Jensen-Shannon** | Score de conservation des positions |
+| **Neighbor-Joining** (avec bootstrap) | Arbre phylogénétique |
+| **IQ-TREE** (maximum de vraisemblance, UFBoot) | Arbre phylogénétique (optionnel, si installé sur le serveur) |
+| **MIp** (information mutuelle corrigée par APC) | Paires de positions coévoluant |
+| **SCA + ICA** | Secteurs protéiques |
+| **DeepTMHMM** (via BioLib) | Prédiction de la topologie membranaire |
+| **ESMFold** (ESM Atlas) | Prédiction de structure |
+| **3Dmol.js et Mol\*** | Visualisation 3D des structures |
+
 ## Architecture
 
 ```
